@@ -34,13 +34,17 @@ textarea{min-height:300px;resize:vertical}
 .send{background:linear-gradient(var(--card2),var(--card2)) padding-box,var(--grad3) border-box;border:1.5px solid transparent;border-radius:12px;padding:14px;margin-top:8px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--card2);border:1px solid var(--line);padding:12px 20px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.3s}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .phase2{margin-top:34px;border-top:1px solid var(--line);padding-top:26px}
-.drop{border:1.5px dashed var(--line);border-radius:14px;background:var(--card);padding:26px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
-.drop.drag{border-color:var(--pink);background:var(--card2)}
-.drop .pick{color:var(--cyan);text-decoration:underline}
-.hintsmall{color:var(--muted);font-size:12px;margin-top:8px}
-.up{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#000;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;word-break:break-all}
-.up .st{white-space:nowrap;font-weight:600}
-.up .st.ok{color:#4ade80}.up .st.err{color:#ff6b8a}.up .st.wait{color:var(--muted)}
+.hintsmall{color:var(--muted);font-size:12px;margin:6px 0 14px}
+.slots{display:flex;flex-direction:column;gap:12px}
+.slot{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.slot.off{opacity:.4;pointer-events:none}
+.slot-lab{font-family:var(--display);font-weight:700;font-size:14px;margin-bottom:3px}
+.slot-name{font-size:12px;color:var(--muted);margin-bottom:10px;word-break:break-all}
+.slot .dz{border:1.5px dashed var(--line);border-radius:12px;padding:16px;text-align:center;cursor:pointer;font-size:13px;color:var(--muted);transition:border-color .2s,background .2s}
+.slot .dz.drag{border-color:var(--pink);background:var(--card2)}
+.slot .dz .pick{color:var(--cyan);text-decoration:underline}
+.slot-status{font-size:13px;margin-top:8px;font-weight:600;min-height:18px;word-break:break-all}
+.slot-status.ok{color:#4ade80}.slot-status.err{color:#ff6b8a}.slot-status.wait,.slot-status.muted{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -85,14 +89,9 @@ textarea{min-height:300px;resize:vertical}
   </div>
 
   <div class="phase2">
-    <label class="q">📤 Envoyer les fichiers sur Bunny <span class="hint">(après les avoir renommés comme indiqué ci-dessus)</span></label>
-    <div id="drop" class="drop">
-      <div style="font-size:26px">📤</div>
-      <div>Glisse tes fichiers ici, ou <span class="pick">clique pour choisir</span></div>
-      <div class="hintsmall">Max 4,4 Mo par fichier (limite technique Vercel de 4,5 Mo). Destination : dossier <b id="dropFolder">—</b></div>
-    </div>
-    <input type="file" id="fileInput" multiple accept="audio/*,video/*" style="display:none">
-    <div id="uploads"></div>
+    <label class="q">📤 Envoyer les fichiers sur Bunny <span class="hint">(chaque case impose le bon nom — rien à renommer)</span></label>
+    <div class="hintsmall">Max 4,4 Mo par fichier (limite technique Vercel de 4,5 Mo). Chaque fichier part automatiquement dans le dossier <b id="slotFolder">—</b></div>
+    <div id="slots" class="slots"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -142,42 +141,68 @@ document.getElementById('go').onclick=async()=>{
   }
 };
 
-// ===== Phase 2 : envoi des fichiers audio/vidéo sur Bunny =====
+// ===== Phase 2 : envoi des fichiers audio/vidéo sur Bunny (4 cases étiquetées) =====
 const MAX_BYTES=4.4*1024*1024;
 function slug(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
 function humanSize(b){return (b/1048576).toFixed(2)+' Mo';}
-const drop=document.getElementById('drop');
-const fileInput=document.getElementById('fileInput');
-const uploads=document.getElementById('uploads');
-const dropFolder=document.getElementById('dropFolder');
-function refreshFolder(){const f=slug(val('id'));dropFolder.textContent=f?(f+'/'):'(racine)';}
-document.getElementById('id').addEventListener('input',refreshFolder);refreshFolder();
-drop.onclick=()=>fileInput.click();
-['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
-['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
-drop.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files)handleFiles(e.dataTransfer.files);});
-fileInput.addEventListener('change',()=>{handleFiles(fileInput.files);fileInput.value='';});
-function handleFiles(list){for(const file of list)uploadFile(file);}
-async function uploadFile(file){
+function currentExt(){return radio('type')==='video'?'mp4':'mp3';}
+// même logique de nommage que api/publish.js : {id}-a, {id}-a-extrait, {id}-b, {id}-b-extrait
+const SLOTS=[
+  {suffix:'a',         ab:'a', label:'Version A — chanson finale'},
+  {suffix:'a-extrait', ab:'a', label:'Extrait A'},
+  {suffix:'b',         ab:'b', label:'Version B — chanson finale'},
+  {suffix:'b-extrait', ab:'b', label:'Extrait B'}
+];
+const slotsWrap=document.getElementById('slots');
+const slotFolder=document.getElementById('slotFolder');
+const slotEls=SLOTS.map(cfg=>{
+  const el=document.createElement('div');el.className='slot';
+  el.innerHTML='<div class="slot-lab">'+cfg.label+'</div>'
+    +'<div class="slot-name"></div>'
+    +'<div class="dz">📤 Glisse le fichier ici, ou <span class="pick">clique pour choisir</span></div>'
+    +'<input type="file" accept="audio/*,video/*" hidden>'
+    +'<div class="slot-status muted"></div>';
+  const dz=el.querySelector('.dz');
+  const input=el.querySelector('input');
+  const statusEl=el.querySelector('.slot-status');
+  dz.onclick=()=>input.click();
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+  ['dragleave','dragend','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+  dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)sendToSlot(cfg,f,statusEl);});
+  input.addEventListener('change',()=>{const f=input.files&&input.files[0];if(f)sendToSlot(cfg,f,statusEl);input.value='';});
+  slotsWrap.appendChild(el);
+  return {cfg, el, nameEl:el.querySelector('.slot-name'), statusEl};
+});
+function refreshSlots(){
   const folder=slug(val('id'));
-  const target=folder?(folder+'/'+file.name):file.name;
-  const row=document.createElement('div');row.className='up';
-  const info=document.createElement('span');info.innerHTML='<b>'+target+'</b> — '+humanSize(file.size);
-  const st=document.createElement('span');st.className='st';
-  row.appendChild(info);row.appendChild(st);uploads.appendChild(row);
-  if(file.size>MAX_BYTES){st.className='st err';st.textContent='❌ Trop lourd ('+humanSize(file.size)+') — max 4,4 Mo';return;}
-  st.className='st wait';st.textContent='Envoi en cours…';
+  const two=radio('versions')==='2';
+  slotFolder.textContent=folder?(folder+'/'):'—';
+  slotEls.forEach(s=>{
+    s.el.classList.toggle('off', s.cfg.ab==='b' && !two);
+    if(!folder){ s.nameEl.textContent="Renseigne d'abord l'Identifiant"; }
+    else { s.nameEl.innerHTML='→ <b>'+folder+'/'+folder+'-'+s.cfg.suffix+'.'+currentExt()+'</b>'; }
+  });
+}
+document.getElementById('id').addEventListener('input',refreshSlots);
+document.querySelectorAll('input[name="type"],input[name="versions"]').forEach(r=>r.addEventListener('change',refreshSlots));
+refreshSlots();
+async function sendToSlot(cfg,file,statusEl){
+  const folder=slug(val('id'));
+  if(!folder){ statusEl.className='slot-status err'; statusEl.textContent="❌ Renseigne d'abord l'Identifiant."; return; }
+  if(file.size>MAX_BYTES){ statusEl.className='slot-status err'; statusEl.textContent='❌ Trop lourd ('+humanSize(file.size)+') — max 4,4 Mo'; return; }
+  const path=folder+'/'+folder+'-'+cfg.suffix+'.'+currentExt();
+  statusEl.className='slot-status wait'; statusEl.textContent='Envoi en cours… ('+humanSize(file.size)+')';
   try{
-    const r=await fetch('/api/upload?name='+encodeURIComponent(target),{
+    const r=await fetch('/api/upload?name='+encodeURIComponent(path),{
       method:'POST',
       headers:{'Content-Type':'application/octet-stream','x-tool-password':val('password')},
       body:file
     });
     const data=await r.json().catch(()=>({}));
     if(!r.ok){throw new Error(data.error||('Erreur '+r.status));}
-    st.className='st ok';st.textContent='✅ Envoyé';
+    statusEl.className='slot-status ok'; statusEl.textContent='✅ Envoyé — '+path+' ('+humanSize(file.size)+')';
   }catch(e){
-    st.className='st err';st.textContent='❌ '+e.message;
+    statusEl.className='slot-status err'; statusEl.textContent='❌ '+e.message;
   }
 }
 </script>
