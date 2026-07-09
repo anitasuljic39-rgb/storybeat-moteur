@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryBeat — Moteur</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&display=swap');
+:root{--bg:#0b0a10;--card:#1c1926;--card2:#26212f;--pink:#ff3aa8;--violet:#9b4dff;--cyan:#1fd6ff;--white:#fff;--muted:rgba(255,255,255,.62);--line:rgba(255,255,255,.14);--grad3:linear-gradient(90deg,#ff3aa8,#9b4dff,#1fd6ff);--display:'Sora',sans-serif;--body:'Manrope',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--white);font-family:var(--body);padding:30px 18px 70px;min-height:100vh}
+.wrap{max-width:640px;margin:0 auto}
+h1{font-family:var(--display);font-weight:800;font-size:26px;margin-bottom:4px}
+.sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+.grp{margin-bottom:18px}
+label.q{display:block;font-weight:600;font-size:14px;margin-bottom:7px}
+label.q .hint{color:var(--muted);font-weight:400;font-size:12px}
+input,textarea,select{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--white);font-family:var(--body);font-size:15px;padding:12px 14px}
+textarea{min-height:300px;resize:vertical}
+.row2{display:flex;gap:12px;flex-wrap:wrap}.row2>div{flex:1 1 220px}
+.radio{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.radio label{flex:1 1 160px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px}
+.radio input{width:auto}
+.check{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px;cursor:pointer;font-size:14px}
+.check input{width:auto}
+.btn{border:none;cursor:pointer;font-family:var(--display);font-weight:700;border-radius:12px;padding:14px 22px;font-size:16px;background:var(--grad3);color:#fff;box-shadow:0 12px 30px -10px rgba(155,77,255,.6)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.copy{background:var(--card2);border:1px solid var(--line);font-family:var(--body);font-weight:600;font-size:12px;padding:6px 10px;box-shadow:none}
+.err{color:#ff6b8a;font-size:14px;margin-top:10px;display:none}.err.show{display:block}
+.out{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:none}.out.show{display:block}
+.out h3{font-family:var(--display);font-size:17px;margin:16px 0 10px}.out h3:first-child{margin-top:0}
+.out .file{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#000;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:13px;word-break:break-all}
+.out a{color:var(--cyan);word-break:break-all}
+.send{background:linear-gradient(var(--card2),var(--card2)) padding-box,var(--grad3) border-box;border:1.5px solid transparent;border-radius:12px;padding:14px;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--card2);border:1px solid var(--line);padding:12px 20px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.3s}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎛️ Moteur StoryBeat</h1>
+  <div class="sub">Remplis, clique : les fiches sont créées et déposées sur GitHub toutes seules. Il te restera juste à mettre les fichiers audio sur Bunny (noms fournis).</div>
+  <div class="grp"><label class="q">Mot de passe de l'outil</label><input id="password" type="password" placeholder="•••••"></div>
+  <div class="row2">
+    <div class="grp"><label class="q">Identifiant cliente <span class="hint">(ex : clara)</span></label><input id="id" placeholder="clara"></div>
+    <div class="grp"><label class="q">Prénom</label><input id="prenom" placeholder="Clara"></div>
+  </div>
+  <div class="grp"><label class="q">Formule</label>
+    <div class="radio">
+      <label><input type="radio" name="versions" value="1"> 1 version (Essentielle)</label>
+      <label><input type="radio" name="versions" value="2" checked> 2 versions (Populaire / Premium)</label>
+    </div>
+  </div>
+  <div class="grp"><label class="q">Type</label>
+    <div class="radio">
+      <label><input type="radio" name="type" value="audio" checked> 🎧 Audio (MP3)</label>
+      <label><input type="radio" name="type" value="video"> 🎬 Vidéo (MP4)</label>
+    </div>
+  </div>
+  <div class="grp"><label class="q">Titre — Version A</label><input id="titreA" placeholder="Ex : Ma prière exaucée"></div>
+  <div class="grp" id="grpTitreB"><label class="q">Titre — Version B</label><input id="titreB" placeholder="Ex : Mon miracle"></div>
+  <div class="grp"><label class="q">Petit texte sous le titre</label><input id="pour" placeholder="Ex : Pour Clara, avec tout mon cœur ❤️"></div>
+  <div class="grp"><label class="q">Paroles <span class="hint">(colle depuis Suno)</span></label>
+    <textarea id="parolesA" placeholder="Colle ici les paroles…"></textarea>
+    <label class="check" id="sameWrap"><input type="checkbox" id="sameParoles" checked> Mêmes paroles pour la Version A et la Version B</label>
+  </div>
+  <div class="grp" id="grpParolesB" style="display:none"><label class="q">Paroles — Version B</label><textarea id="parolesB" placeholder="Paroles différentes pour la version B…"></textarea></div>
+  <button class="btn" id="go" type="button">🚀 Créer et publier les fiches</button>
+  <div class="err" id="err"></div>
+  <div class="out" id="out">
+    <h3>📦 À déposer sur Bunny</h3>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Crée un dossier <b id="o-folder"></b> sur Bunny et mets-y ces fichiers (noms exacts) :</div>
+    <div id="o-files"></div>
+    <h3>🔎 À vérifier (pour toi)</h3>
+    <div id="o-finals"></div>
+    <h3>📩 À envoyer à la cliente</h3>
+    <div class="send">Le SEUL lien à transmettre :<br><a id="o-valid" href="#" target="_blank"></a> <button class="btn copy" type="button" id="copyValid">Copier</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1700);}
+function val(id){return document.getElementById(id).value;}
+function radio(n){const el=document.querySelector('input[name="'+n+'"]:checked');return el?el.value:'';}
+document.querySelectorAll('input[name="versions"]').forEach(r=>r.addEventListener('change',()=>{
+  const two=radio('versions')==='2';
+  document.getElementById('grpTitreB').style.display=two?'block':'none';
+  document.getElementById('sameWrap').style.display=two?'flex':'none';
+  if(!two) document.getElementById('grpParolesB').style.display='none';
+  else document.getElementById('grpParolesB').style.display=document.getElementById('sameParoles').checked?'none':'block';
+}));
+document.getElementById('sameParoles').addEventListener('change',(e)=>{
+  document.getElementById('grpParolesB').style.display=e.target.checked?'none':'block';
+});
+document.getElementById('go').onclick=async()=>{
+  const err=document.getElementById('err');err.classList.remove('show');
+  const btn=document.getElementById('go');
+  const two=radio('versions')==='2';
+  const payload={
+    password:val('password'), id:val('id'), prenom:val('prenom'),
+    versions:radio('versions'), type:radio('type'),
+    titreA:val('titreA'), titreB:val('titreB'), pour:val('pour'),
+    parolesA:val('parolesA'),
+    parolesB:(two && !document.getElementById('sameParoles').checked)?val('parolesB'):''
+  };
+  btn.disabled=true;btn.textContent='⏳ Publication en cours…';
+  try{
+    const r=await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await r.json();
+    if(!r.ok){throw new Error(data.error||'Erreur inconnue');}
+    document.getElementById('o-folder').textContent=data.folder+'/';
+    document.getElementById('o-files').innerHTML=data.filesToUpload.map(f=>
+      '<div class="file"><span>'+f+'</span><button class="btn copy" type="button" onclick="navigator.clipboard.writeText(\''+f+'\').then(()=>toast(\'Copié !\'))">copier</button></div>').join('');
+    document.getElementById('o-finals').innerHTML=data.finalLinks.map(l=>
+      '<div style="margin-bottom:8px;font-size:14px">'+l.label+' : <a href="'+l.url+'" target="_blank">'+l.url+'</a></div>').join('');
+    const va=document.getElementById('o-valid');va.href=data.validationLink;va.textContent=data.validationLink;
+    document.getElementById('copyValid').onclick=()=>navigator.clipboard.writeText(data.validationLink).then(()=>toast('Lien copié !'));
+    document.getElementById('out').classList.add('show');
+    document.getElementById('out').scrollIntoView({behavior:'smooth'});
+  }catch(e){
+    err.textContent='❌ '+e.message;err.classList.add('show');
+  }finally{
+    btn.disabled=false;btn.textContent='🚀 Créer et publier les fiches';
+  }
+};
+</script>
+</body>
+</html>
