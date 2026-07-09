@@ -45,6 +45,9 @@ textarea{min-height:300px;resize:vertical}
 .slot .dz .pick{color:var(--cyan);text-decoration:underline}
 .slot-status{font-size:13px;margin-top:8px;font-weight:600;min-height:18px;word-break:break-all}
 .slot-status.ok{color:#4ade80}.slot-status.err{color:#ff6b8a}.slot-status.wait,.slot-status.muted{color:var(--muted)}
+.slot-status .manual{font-weight:400;color:var(--muted);margin-top:6px;font-size:12.5px;line-height:1.6}
+.slot-status .manual b{color:var(--white)}
+.slot-status .manual-btns{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -189,8 +192,20 @@ refreshSlots();
 async function sendToSlot(cfg,file,statusEl){
   const folder=slug(val('id'));
   if(!folder){ statusEl.className='slot-status err'; statusEl.textContent="❌ Renseigne d'abord l'Identifiant."; return; }
-  if(file.size>MAX_BYTES){ statusEl.className='slot-status err'; statusEl.textContent='❌ Trop lourd ('+humanSize(file.size)+') — max 4,4 Mo'; return; }
-  const path=folder+'/'+folder+'-'+cfg.suffix+'.'+currentExt();
+  const fn=folder+'-'+cfg.suffix+'.'+currentExt();
+  const path=folder+'/'+fn;
+  if(file.size>MAX_BYTES){
+    statusEl.className='slot-status err';
+    statusEl.innerHTML='⚠️ '+humanSize(file.size)+" — trop lourd pour l'envoi automatique (limite technique 4,4 Mo)."
+      +'<div class="manual">À déposer manuellement dans Bunny :'
+      +'<div>Dossier : <b>'+folder+'/</b></div>'
+      +'<div>Nom exact du fichier : <b>'+fn+'</b></div>'
+      +'<div class="manual-btns"><button class="btn copy" type="button" data-copy="folder">Copier le dossier</button><button class="btn copy" type="button" data-copy="name">Copier le nom</button></div>'
+      +'</div>';
+    statusEl.querySelector('[data-copy="folder"]').onclick=()=>navigator.clipboard.writeText(folder+'/').then(()=>toast('Dossier copié !'));
+    statusEl.querySelector('[data-copy="name"]').onclick=()=>navigator.clipboard.writeText(fn).then(()=>toast('Nom copié !'));
+    return;
+  }
   statusEl.className='slot-status wait'; statusEl.textContent='Envoi en cours… ('+humanSize(file.size)+')';
   try{
     const r=await fetch('/api/upload?name='+encodeURIComponent(path),{
