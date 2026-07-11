@@ -56,7 +56,7 @@ textarea{min-height:300px;resize:vertical}
   <div class="sub">Remplis, clique : les fiches sont créées et déposées sur GitHub toutes seules. Il te restera juste à mettre les fichiers audio sur Bunny (noms fournis).</div>
   <div class="grp"><label class="q">Mot de passe de l'outil</label><input id="password" type="password" placeholder="•••••"></div>
   <div class="row2">
-    <div class="grp"><label class="q">Identifiant cliente <span class="hint">(ex : clara)</span></label><input id="id" placeholder="clara"></div>
+    <div class="grp"><label class="q">Identifiant cliente <span class="hint">(ex : clara — un code unique est ajouté tout seul)</span></label><input id="id" placeholder="clara"><button type="button" id="genUnique" style="margin-top:8px;padding:9px 16px;font-size:13px;border:none;border-radius:10px;background:#ff3aa8;color:#fff;font-weight:700;cursor:pointer">🎲 Nouveau code unique</button><div id="idNote" class="hint" style="margin-top:6px"></div></div>
     <div class="grp"><label class="q">Prénom</label><input id="prenom" placeholder="Clara"></div>
   </div>
   <div class="grp"><label class="q">Formule</label>
@@ -189,6 +189,23 @@ function refreshSlots(){
 document.getElementById('id').addEventListener('input',refreshSlots);
 document.querySelectorAll('input[name="type"],input[name="versions"]').forEach(r=>r.addEventListener('change',refreshSlots));
 refreshSlots();
+// ===== Identifiant unique automatique (anti-collision) =====
+function uniqueCode(){ return Math.random().toString(36).slice(2,6); }
+const idEl=document.getElementById('id');
+const idNote=document.getElementById('idNote');
+function makeUnique(regen){
+  let base = (regen && idEl.dataset.base) ? idEl.dataset.base : slug(idEl.value);
+  if(!base){ if(idNote) idNote.textContent='Écris d’abord un identifiant (ex : clara).'; return; }
+  idEl.dataset.base = base;
+  idEl.value = base + '-' + uniqueCode();
+  idEl.dataset.coded = '1';
+  refreshSlots();
+  if(idNote) idNote.innerHTML='✅ Identifiant unique : <b>'+idEl.value+'</b> — c’est celui à utiliser pour le calage et le QR.';
+}
+idEl.addEventListener('input',()=>{ idEl.dataset.coded=''; });
+idEl.addEventListener('blur',()=>{ if(!idEl.dataset.coded && slug(idEl.value)) makeUnique(false); });
+const genBtn=document.getElementById('genUnique');
+if(genBtn) genBtn.onclick=()=>makeUnique(true);
 async function sendToSlot(cfg,file,statusEl){
   const folder=slug(val('id'));
   if(!folder){ statusEl.className='slot-status err'; statusEl.textContent="❌ Renseigne d'abord l'Identifiant."; return; }
