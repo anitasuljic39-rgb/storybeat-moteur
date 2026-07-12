@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Carnet de commandes — StoryBeat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --fuchsia:#ff3aa8; --violet:#9b4dff; --blue:#1fd6ff;
+    --grad:linear-gradient(90deg,#ff3aa8,#9b4dff,#1fd6ff);
+    --bg:#0e0b14; --panel:#171221; --panel2:#1e1830;
+    --line:#2c2340; --txt:#f4f0fb; --muted:#a99fc4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+  .logo{font-family:'Sora',sans-serif;font-weight:800;font-size:26px;letter-spacing:.5px}
+  .logo .b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:6px}
+  .sub{color:var(--muted);font-size:14px;margin:2px 0 26px}
+  /* écran mot de passe */
+  .gate{max-width:420px;margin:60px auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px}
+  .gate h1{font-family:'Sora';font-weight:800;font-size:22px;margin:0 0 6px}
+  .gate p{color:var(--muted);font-size:14px;margin:0 0 20px}
+  input[type=password],input[type=text]{width:100%;padding:13px 15px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font-size:15px;font-family:inherit}
+  input:focus{outline:none;border-color:var(--violet)}
+  .btn{border:none;cursor:pointer;font-family:'Manrope';font-weight:700;font-size:15px;color:#fff;background:var(--fuchsia);padding:13px 20px;border-radius:12px;width:100%;margin-top:14px;transition:filter .2s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.small{width:auto;padding:9px 16px;font-size:13px;background:var(--panel2);border:1px solid var(--line)}
+  .err{color:#ff6b9d;font-size:13px;margin-top:12px;min-height:18px}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .count{color:var(--muted);font-size:14px}
+  .count b{color:var(--txt)}
+  /* liste */
+  .grid{display:grid;grid-template-columns:1fr;gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;cursor:pointer;transition:border-color .15s,transform .1s;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+  .card:hover{border-color:var(--violet);transform:translateY(-1px)}
+  .card .em{font-weight:700;font-size:15px}
+  .card .msg{color:var(--muted);font-size:13.5px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:520px}
+  .card .date{color:var(--muted);font-size:12px;margin-top:6px}
+  .badge{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap}
+  .b-pop{background:rgba(155,77,255,.16);color:#c8a6ff;border:1px solid rgba(155,77,255,.4)}
+  .b-prem{background:linear-gradient(90deg,rgba(255,58,168,.18),rgba(31,214,255,.18));color:#ffd9ec;border:1px solid rgba(255,58,168,.4)}
+  .b-ess{background:rgba(31,214,255,.14);color:#a6ecff;border:1px solid rgba(31,214,255,.4)}
+  .empty{text-align:center;color:var(--muted);padding:60px 20px;border:1px dashed var(--line);border-radius:16px}
+  /* détail (modale) */
+  .overlay{position:fixed;inset:0;background:rgba(6,4,12,.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+  .overlay.on{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:560px;width:100%;max-height:85vh;overflow:auto;padding:26px}
+  .modal h2{font-family:'Sora';font-weight:800;font-size:19px;margin:0 0 4px;word-break:break-word}
+  .modal .close{float:right;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;border:none;background:none}
+  .row{padding:12px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+  .row .v{font-size:15px;word-break:break-word;white-space:pre-wrap}
+  .file{color:var(--muted);font-size:11px;margin-top:14px;word-break:break-all}
+  .spin{text-align:center;color:var(--muted);padding:50px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ÉCRAN MOT DE PASSE -->
+  <div id="gate" class="gate">
+    <div class="logo" style="margin-bottom:18px">STORY<span class="b">BEAT</span></div>
+    <h1>Carnet de commandes</h1>
+    <p>Espace privé. Entre ton mot de passe pour accéder à tes commandes.</p>
+    <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="btn" id="go">Ouvrir le carnet</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+
+  <!-- CARNET -->
+  <div id="app" style="display:none">
+    <header>
+      <div>
+        <div class="logo">STORY<span class="b">BEAT</span></div>
+      </div>
+      <button class="btn small" id="logout">Se déconnecter</button>
+    </header>
+    <div class="sub">Carnet de commandes — espace privé</div>
+
+    <div class="toolbar">
+      <button class="btn small" id="refresh">↻ Actualiser</button>
+      <div class="count" id="count"></div>
+    </div>
+
+    <div id="list"></div>
+  </div>
+
+</div>
+
+<!-- MODALE DÉTAIL -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const API = '/api/carnet-list';
+let PW = '';
+
+const $ = s => document.querySelector(s);
+
+function badgeClass(f){
+  f = (f||'').toLowerCase();
+  if(f.includes('prem')) return 'b-prem';
+  if(f.includes('pop'))  return 'b-pop';
+  return 'b-ess';
+}
+function fmtDate(iso){
+  if(!iso) return '';
+  try{ const d=new Date(iso); return d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return iso; }
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function load(){
+  $('#list').innerHTML = '<div class="spin">Chargement du carnet…</div>';
+  try{
+    const r = await fetch(API, { headers: { 'x-tool-password': PW } });
+    if(r.status === 401){ logout('Mot de passe incorrect.'); return; }
+    const data = await r.json();
+    if(!r.ok){ $('#list').innerHTML = '<div class="empty">Erreur : '+esc(data.error||'inconnue')+'</div>'; return; }
+    render(data.commandes || []);
+  }catch(e){
+    $('#list').innerHTML = '<div class="empty">Impossible de contacter le carnet. Réessaie.</div>';
+  }
+}
+
+function render(cmds){
+  $('#count').innerHTML = '<b>'+cmds.length+'</b> commande'+(cmds.length>1?'s':'');
+  if(!cmds.length){
+    $('#list').innerHTML = '<div class="empty">Aucune commande pour l’instant.<br>Elles apparaîtront ici automatiquement.</div>';
+    return;
+  }
+  window.__cmds = cmds;
+  const html = '<div class="grid">' + cmds.map((c,i)=>`
+    <div class="card" onclick="openDetail(${i})">
+      <div>
+        <div class="em">${esc(c.email||'—')}</div>
+        <div class="msg">${esc(c.message||'(pas de message)')}</div>
+        <div class="date">${esc(fmtDate(c.recu_le))}</div>
+      </div>
+      <span class="badge ${badgeClass(c.formule)}">${esc(c.formule||'—')}</span>
+    </div>`).join('') + '</div>';
+  $('#list').innerHTML = html;
+}
+
+window.openDetail = function(i){
+  const c = (window.__cmds||[])[i]; if(!c) return;
+  const champs = [
+    ['E-mail', c.email],
+    ['Formule', c.formule],
+    ['Style de carte', c.style],
+    ['Message', c.message],
+    ['Signature', c.signature],
+    ['Reçue le', fmtDate(c.recu_le)],
+    ['Source', c.source]
+  ];
+  const rows = champs.filter(x=>x[1]!=null && x[1]!=='').map(x=>`
+    <div class="row"><div class="k">${esc(x[0])}</div><div class="v">${esc(x[1])}</div></div>`).join('');
+  $('#modal').innerHTML = `
+    <button class="close" onclick="closeDetail()">×</button>
+    <h2>${esc(c.email||'Commande')}</h2>
+    <span class="badge ${badgeClass(c.formule)}">${esc(c.formule||'—')}</span>
+    <div style="margin-top:16px">${rows}</div>
+    <div class="file">Fichier : ${esc(c.fichier||'')}</div>`;
+  $('#overlay').classList.add('on');
+};
+window.closeDetail = function(){ $('#overlay').classList.remove('on'); };
+$('#overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeDetail(); });
+
+function enter(pw){
+  PW = pw;
+  try{ localStorage.setItem('sb_carnet_pw', pw); }catch(e){}
+  $('#gate').style.display='none';
+  $('#app').style.display='block';
+  load();
+}
+function logout(msg){
+  PW='';
+  try{ localStorage.removeItem('sb_carnet_pw'); }catch(e){}
+  $('#app').style.display='none';
+  $('#gate').style.display='block';
+  $('#pw').value='';
+  $('#gateErr').textContent = msg||'';
+}
+
+$('#go').addEventListener('click', ()=>{
+  const pw = $('#pw').value.trim();
+  if(!pw){ $('#gateErr').textContent='Entre ton mot de passe.'; return; }
+  $('#gateErr').textContent='';
+  enter(pw);
+});
+$('#pw').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#go').click(); });
+$('#refresh').addEventListener('click', load);
+$('#logout').addEventListener('click', ()=>logout());
+
+// reconnexion auto si mot de passe déjà mémorisé
+(function(){
+  let saved=''; try{ saved=localStorage.getItem('sb_carnet_pw')||''; }catch(e){}
+  if(saved) enter(saved);
+})();
+</script>
+</body>
+</html>
