@@ -211,27 +211,17 @@ async function sendToSlot(cfg,file,statusEl){
   if(!folder){ statusEl.className='slot-status err'; statusEl.textContent="❌ Renseigne d'abord l'Identifiant."; return; }
   const fn=folder+'-'+cfg.suffix+'.'+currentExt();
   const path=folder+'/'+fn;
-  if(file.size>MAX_BYTES){
-    statusEl.className='slot-status err';
-    statusEl.innerHTML='⚠️ '+humanSize(file.size)+" — trop lourd pour l'envoi automatique (limite technique 4,4 Mo)."
-      +'<div class="manual">À déposer manuellement dans Bunny :'
-      +'<div>Dossier : <b>'+folder+'/</b></div>'
-      +'<div>Nom exact du fichier : <b>'+fn+'</b></div>'
-      +'<div class="manual-btns"><button class="btn copy" type="button" data-copy="folder">Copier le dossier</button><button class="btn copy" type="button" data-copy="name">Copier le nom</button></div>'
-      +'</div>';
-    statusEl.querySelector('[data-copy="folder"]').onclick=()=>navigator.clipboard.writeText(folder+'/').then(()=>toast('Dossier copié !'));
-    statusEl.querySelector('[data-copy="name"]').onclick=()=>navigator.clipboard.writeText(fn).then(()=>toast('Nom copié !'));
-    return;
-  }
-  statusEl.className='slot-status wait'; statusEl.textContent='Envoi en cours… ('+humanSize(file.size)+')';
+  statusEl.className='slot-status wait'; statusEl.textContent='Préparation… ('+humanSize(file.size)+')';
   try{
-    const r=await fetch('/api/upload?name='+encodeURIComponent(path),{
+    const signResp=await fetch('/api/sign-upload?name='+encodeURIComponent(path),{
       method:'POST',
-      headers:{'Content-Type':'application/octet-stream','x-tool-password':val('password')},
-      body:file
+      headers:{'x-tool-password':val('password')}
     });
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok){throw new Error(data.error||('Erreur '+r.status));}
+    const signData=await signResp.json().catch(()=>({}));
+    if(!signResp.ok||!signData.uploadUrl){ throw new Error(signData.error||('Erreur pass '+signResp.status)); }
+    statusEl.className='slot-status wait'; statusEl.textContent='Envoi en cours… ('+humanSize(file.size)+')';
+    const up=await fetch(signData.uploadUrl,{ method:'PUT', body:file });
+    if(up.status!==200 && up.status!==201){ let t=''; try{t=await up.text();}catch(e){} throw new Error('Bunny '+up.status+(t?' : '+t.slice(0,200):'')); }
     statusEl.className='slot-status ok'; statusEl.textContent='✅ Envoyé — '+path+' ('+humanSize(file.size)+')';
   }catch(e){
     statusEl.className='slot-status err'; statusEl.textContent='❌ '+e.message;
