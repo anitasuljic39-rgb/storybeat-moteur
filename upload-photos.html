@@ -67,7 +67,14 @@
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .thumb .ph{font-size:30px}
   .fname{font-size:11px;padding:6px 8px 0;word-break:break-all;line-height:1.3;max-height:34px;overflow:hidden}
-  .fsize{font-size:11px;color:var(--muted);padding:2px 8px 8px}
+  .fsize{font-size:11px;color:var(--muted);padding:2px 8px 6px}
+  .tact{padding:0 8px 8px;margin-top:auto}
+  .del{width:100%;border:1px solid var(--line);background:#fff;color:#b23a6b;font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;padding:6px;border-radius:8px;cursor:pointer}
+  .del:hover{background:#fff0f5}
+  .confirm{display:none;font-size:11.5px;text-align:center;color:var(--muted);line-height:1.5}
+  .confirm button{border:none;background:none;font-weight:700;cursor:pointer;font-size:12px;padding:4px 8px;font-family:'Manrope',sans-serif}
+  .confirm .yes{color:#d6006a}
+  .confirm .no{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -116,8 +123,9 @@
   var params = new URLSearchParams(location.search);
   var CODE  = (params.get('c') || '').trim();
   var TOKEN = (params.get('t') || '').trim();
-  var API      = '/api/client-sign-upload';
-  var API_LIST = '/api/client-list';
+  var API        = '/api/client-sign-upload';
+  var API_LIST   = '/api/client-list';
+  var API_DELETE = '/api/client-delete';
   var MAX_BYTES  = 500 * 1024 * 1024; // 500 Mo par fichier
   var SOFT_LIMIT = 20;                 // garde-fou souple (n'empêche rien)
   var sentCount = 0;
@@ -264,12 +272,36 @@
       else                  media = '<div class="ph">📄</div>';
       return '<div class="tile"><div class="thumb">' + media + '</div>'
            + '<div class="fname">' + esc(f.name) + '</div>'
-           + '<div class="fsize">' + humanSize(f.size) + '</div></div>';
+           + '<div class="fsize">' + humanSize(f.size) + '</div>'
+           + '<div class="tact">'
+           +   '<button class="del" type="button">🗑️ Supprimer</button>'
+           +   '<div class="confirm">Retirer&nbsp;? <button class="yes" type="button">Oui</button> · <button class="no" type="button">Annuler</button></div>'
+           + '</div></div>';
     }).join('');
     // Photo illisible dans le navigateur (ex. HEIC iPhone) : on remplace par une icône, sans casser la tuile.
     Array.prototype.forEach.call(g.querySelectorAll('img'), function(im){
       im.onerror = function(){ this.parentElement.innerHTML = '<div class="ph">🖼️</div>'; };
     });
+    // Bouton Supprimer + confirmation douce en 2 temps, tuile par tuile.
+    var tiles = g.querySelectorAll('.tile');
+    files.forEach(function(f, i){
+      var tile = tiles[i]; if (!tile) return;
+      var delBtn  = tile.querySelector('.del');
+      var confirm = tile.querySelector('.confirm');
+      delBtn.addEventListener('click', function(){ delBtn.style.display='none'; confirm.style.display='block'; });
+      tile.querySelector('.no').addEventListener('click', function(){ confirm.style.display='none'; delBtn.style.display='block'; });
+      tile.querySelector('.yes').addEventListener('click', function(){ removeFile(f, confirm); });
+    });
+  }
+  function removeFile(f, confirmEl){
+    confirmEl.innerHTML = 'Suppression…';
+    fetch(API_DELETE + '?c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN) + '&name=' + encodeURIComponent(f.name), { method:'POST' })
+      .then(function(r){ return r.json().catch(function(){ return {}; }); })
+      .then(function(d){
+        if (d && d.ok) { loadGallery(); }             // recharge : la tuile disparaît
+        else { confirmEl.innerHTML = '❌ Échec, réessaie'; }
+      })
+      .catch(function(){ confirmEl.innerHTML = '❌ Réseau, réessaie'; });
   }
 </script>
 </body>
