@@ -57,6 +57,17 @@
   .gate-err h2{font-family:'Sora',sans-serif;font-size:18px;margin:0 0 8px}
   .gate-err p{color:var(--muted);font-size:14px;line-height:1.55;margin:0}
   .reassure{color:var(--muted);font-size:13px;line-height:1.55;margin-top:24px;text-align:center}
+  /* Galerie « déjà envoyé » */
+  .gwrap{margin-top:26px}
+  .gtitle{font-family:'Sora',sans-serif;font-weight:700;font-size:17px;margin:0 0 4px}
+  .gnote{color:var(--muted);font-size:13px;margin-bottom:12px}
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:12px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .thumb{aspect-ratio:1/1;background:#f3eefb;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .ph{font-size:30px}
+  .fname{font-size:11px;padding:6px 8px 0;word-break:break-all;line-height:1.3;max-height:34px;overflow:hidden}
+  .fsize{font-size:11px;color:var(--muted);padding:2px 8px 8px}
 </style>
 </head>
 <body>
@@ -91,6 +102,12 @@
     <div class="soft" id="soft"></div>
     <div class="files" id="files"></div>
 
+    <div class="gwrap" id="gallery-wrap" style="display:none">
+      <h2 class="gtitle">📁 Ce que tu as déjà envoyé</h2>
+      <div class="gnote" id="gnote"></div>
+      <div class="gallery" id="gallery"></div>
+    </div>
+
     <div class="reassure">Tu peux fermer cette page et <b>revenir plus tard avec le même lien</b> pour en ajouter — tes envois sont bien gardés. 🌸</div>
   </div>
 </div>
@@ -99,7 +116,8 @@
   var params = new URLSearchParams(location.search);
   var CODE  = (params.get('c') || '').trim();
   var TOKEN = (params.get('t') || '').trim();
-  var API   = '/api/client-sign-upload';
+  var API      = '/api/client-sign-upload';
+  var API_LIST = '/api/client-list';
   var MAX_BYTES  = 500 * 1024 * 1024; // 500 Mo par fichier
   var SOFT_LIMIT = 20;                 // garde-fou souple (n'empêche rien)
   var sentCount = 0;
@@ -114,6 +132,8 @@
   if (!CODE || !TOKEN) {
     elMain.style.display = 'none';
     elGate.classList.add('show');
+  } else {
+    loadGallery(); // à l'ouverture, on montre ce qui est déjà dans le dossier
   }
 
   function humanSize(b){
@@ -195,6 +215,7 @@
         bar.style.width='100%';
         st.className='status ok'; st.textContent='✅ C’est bien reçu !';
         sentCount++; updateCounter();
+        loadGallery(); // rafraîchit la galerie avec le contenu réel du dossier
       })
       .catch(function(e){
         if (e && e.message === 'lien invalide') return; // déjà géré par le bandeau
@@ -210,6 +231,44 @@
       xhr.onload  = function(){ (xhr.status===200 || xhr.status===201) ? resolve() : reject(new Error('Bunny ' + xhr.status)); };
       xhr.onerror = function(){ reject(new Error('réseau')); };
       xhr.send(file);
+    });
+  }
+
+  // ===== Galerie : ce que la cliente a déjà envoyé (contenu réel du dossier) =====
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function kind(name){
+    var e = (name.split('.').pop() || '').toLowerCase();
+    if (['jpg','jpeg','png','webp','gif','bmp','avif','heic','heif'].indexOf(e) !== -1) return 'image';
+    if (['mp4','mov','webm','m4v','ogg','ogv','avi','mkv'].indexOf(e) !== -1) return 'video';
+    return 'other';
+  }
+  function loadGallery(){
+    if (!CODE || !TOKEN) return;
+    fetch(API_LIST + '?c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN), { method:'POST' })
+      .then(function(r){ return r.json().catch(function(){ return {}; }); })
+      .then(function(d){ if (d && d.ok) renderGallery(d.files || []); })
+      .catch(function(){ /* silencieux : on ne casse jamais la page */ });
+  }
+  function renderGallery(files){
+    sentCount = files.length; updateCounter();
+    var wrap = document.getElementById('gallery-wrap');
+    var g    = document.getElementById('gallery');
+    var note = document.getElementById('gnote');
+    if (!files.length){ wrap.style.display='none'; g.innerHTML=''; return; }
+    wrap.style.display = 'block';
+    note.textContent = files.length + ' fichier' + (files.length>1?'s':'') + ' dans ton dossier';
+    g.innerHTML = files.map(function(f){
+      var k = kind(f.name), media;
+      if (k==='image')      media = '<img loading="lazy" src="' + esc(f.url) + '" alt="">';
+      else if (k==='video') media = '<div class="ph">🎬</div>';
+      else                  media = '<div class="ph">📄</div>';
+      return '<div class="tile"><div class="thumb">' + media + '</div>'
+           + '<div class="fname">' + esc(f.name) + '</div>'
+           + '<div class="fsize">' + humanSize(f.size) + '</div></div>';
+    }).join('');
+    // Photo illisible dans le navigateur (ex. HEIC iPhone) : on remplace par une icône, sans casser la tuile.
+    Array.prototype.forEach.call(g.querySelectorAll('img'), function(im){
+      im.onerror = function(){ this.parentElement.innerHTML = '<div class="ph">🖼️</div>'; };
     });
   }
 </script>

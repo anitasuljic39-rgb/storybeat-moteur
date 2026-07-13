@@ -1,0 +1,98 @@
+// api/client-list.js — StoryBeat
+// Liste (CÔTÉ SERVEUR) les fichiers du dossier premium/{code}/ d'une cliente.
+// Sécurité : même jeton HMAC que client-sign-upload.js. La clé Bunny reste au serveur.
+// Réutilise BUNNY_S3_SECRET (déjà en place) — aucune nouvelle variable à ajouter.
+const crypto = require('crypto');
+
+const REGION   = 'de';
+const HOST     = 'de-s3.storage.bunnycdn.com';
+const BUCKET   = 'storybeat-media';
+const CDN_BASE = 'https://storybeat.b-cdn.net';
+
+// ---- Jeton cliente (identique à client-sign-upload.js) ----
+function tokenFor(code, secret) {
+  return crypto.createHmac('sha256', secret).update('premium/' + code, 'utf8').digest('hex').slice(0, 32);
+}
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a)); const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) return false;
+  try { return crypto.timingSafeEqual(ba, bb); } catch (e) { return false; }
+}
+
+// ---- Signature S3 (méthode quelconque + paramètres de requête en plus) ----
+function hmac(key, str) { return crypto.createHmac('sha256', key).update(str, 'utf8').digest(); }
+function sha256hex(str) { return crypto.createHash('sha256').update(str, 'utf8').digest('hex'); }
+function awsUriEncode(str, encodeSlash) {
+  let out = '';
+  for (const b of Buffer.from(String(str), 'utf8')) {
+    const c = String.fromCharCode(b);
+    if ((b>=0x41&&b<=0x5A)||(b>=0x61&&b<=0x7A)||(b>=0x30&&b<=0x39)||c==='-'||c==='_'||c==='.'||c==='~') out += c;
+    else if (c === '/' && !encodeSlash) out += '/';
+    else out += '%' + b.toString(16).toUpperCase().padStart(2, '0');
+  }
+  return out;
+}
+function presign(method, canonicalUri, extra, secret) {
+  const t = new Date(); const p = (n) => String(n).padStart(2, '0');
+  const datestamp = `${t.getUTCFullYear()}${p(t.getUTCMonth()+1)}${p(t.getUTCDate())}`;
+  const amz = `${datestamp}T${p(t.getUTCHours())}${p(t.getUTCMinutes())}${p(t.getUTCSeconds())}Z`;
+  const scope = `${datestamp}/${REGION}/s3/aws4_request`;
+  const params = Object.assign({
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${BUCKET}/${scope}`,
+    'X-Amz-Date': amz,
+    'X-Amz-Expires': '120',
+    'X-Amz-SignedHeaders': 'host'
+  }, extra || {});
+  const canonicalQuery = Object.keys(params).sort()
+    .map(k => awsUriEncode(k, true) + '=' + awsUriEncode(params[k], true)).join('&');
+  const canonicalRequest = [method, canonicalUri, canonicalQuery, `host:${HOST}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amz, scope, sha256hex(canonicalRequest)].join('\n');
+  const kSigning = hmac(hmac(hmac(hmac('AWS4' + secret, datestamp), REGION), 's3'), 'aws4_request');
+  const signature = crypto.createHmac('sha256', kSigning).update(stringToSign, 'utf8').digest('hex');
+  return `https://${HOST}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+module.exports = async (req, res) => {
+  const getQuery = (r) => {
+    if (r.query) return r.query;
+    try { const u = new URL(r.url, 'http://x'); const o = {}; u.searchParams.forEach((v,k)=>{o[k]=v;}); return o; }
+    catch (e) { return {}; }
+  };
+  const q = getQuery(req);
+
+  const clientSecret = process.env.CLIENT_UPLOAD_SECRET;
+  const bunnySecret  = process.env.BUNNY_S3_SECRET;
+  if (!clientSecret || !bunnySecret) {
+    res.status(500).json({ error: 'Configuration serveur incomplète (CLIENT_UPLOAD_SECRET / BUNNY_S3_SECRET).' }); return;
+  }
+
+  const code  = String(q.c || '').trim().toLowerCase();
+  const token = String(q.t || '').trim();
+  if (!/^[a-z0-9][a-z0-9-]{1,60}$/.test(code)) { res.status(400).json({ error: 'Lien invalide.' }); return; }
+  if (!safeEqual(token, tokenFor(code, clientSecret))) { res.status(403).json({ error: 'Lien invalide.' }); return; }
+
+  const prefix = 'premium/' + code + '/';
+  const url = presign('GET', '/' + awsUriEncode(BUCKET, true), { 'list-type': '2', 'prefix': prefix }, bunnySecret);
+  try {
+    const r = await fetch(url, { method: 'GET' });
+    if (!r.ok) { const t = await r.text(); res.status(502).json({ error: 'Bunny ' + r.status, detail: t.slice(0, 300) }); return; }
+    const xml = await r.text();
+    const files = [];
+    const blocks = xml.match(/<Contents>[\s\S]*?<\/Contents>/g) || [];
+    for (const b of blocks) {
+      const km = b.match(/<Key>([\s\S]*?)<\/Key>/);
+      const sm = b.match(/<Size>([\s\S]*?)<\/Size>/);
+      if (!km) continue;
+      const key = km[1];
+      if (key === prefix) continue;                 // ignore le "dossier" lui-même
+      const name = key.slice(prefix.length);
+      if (!name || name.indexOf('/') !== -1) continue; // pas de sous-dossier
+      files.push({ name: name, size: sm ? parseInt(sm[1], 10) : 0, url: CDN_BASE + '/' + prefix + name });
+    }
+    files.sort((a, b) => a.name < b.name ? -1 : (a.name > b.name ? 1 : 0));
+    res.status(200).json({ ok: true, total: files.length, files: files });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur lecture du dossier : ' + e.message });
+  }
+};
