@@ -83,7 +83,9 @@
       <button class="btn" type="button" id="pickBtn">Choisir mes fichiers</button>
       <div class="small">Photos et vidéos acceptées · jusqu'à 500 Mo par fichier</div>
     </div>
-    <input type="file" id="fileInput" accept="image/*,video/*" multiple hidden>
+    <!-- Pas d'attribut accept : la fenêtre montre TOUS les fichiers (aucune photo grisée, HEIC iPhone compris).
+         La validation "images + vidéos uniquement" reste faite plus bas dans addFile(). -->
+    <input type="file" id="fileInput" multiple hidden>
 
     <div class="counter" id="counter"><b>0</b> fichier envoyé</div>
     <div class="soft" id="soft"></div>
