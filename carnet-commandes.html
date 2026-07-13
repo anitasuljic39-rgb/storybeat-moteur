@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>StoryBeat — Carnet des commandes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --fuchsia:#ff3aa8; --violet:#9b4dff; --blue:#1fd6ff;
+    --grad:linear-gradient(90deg,#ff3aa8,#9b4dff,#1fd6ff);
+    --bg:#faf7ff; --card:#ffffff; --card2:#f3eefb; --line:#e3d9f5;
+    --txt:#211a33; --muted:#6b6480;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;padding:22px 14px 70px}
+  .wrap{max-width:920px;margin:0 auto}
+  .logo{font-family:'Sora',sans-serif;font-weight:800;font-size:22px;letter-spacing:.5px}
+  .logo .b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  a{color:var(--violet)}
+  /* écran mot de passe */
+  .gate{max-width:400px;margin:56px auto;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;box-shadow:0 14px 40px -26px rgba(90,50,140,.4)}
+  .gate h1{font-family:'Sora';font-weight:800;font-size:20px;margin:14px 0 6px}
+  .gate p{color:var(--muted);font-size:14px;margin:0 0 18px}
+  input[type=password]{width:100%;padding:13px 15px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--txt);font-size:15px;font-family:inherit}
+  input:focus{outline:none;border-color:var(--violet)}
+  .btn{border:none;cursor:pointer;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;color:#fff;background:var(--grad);padding:12px 18px;border-radius:12px;box-shadow:0 10px 24px -12px rgba(155,77,255,.7)}
+  .btn:disabled{opacity:.55;cursor:wait}
+  .btn.ghost{background:#fff;color:#4a3f66;border:1px solid var(--line);box-shadow:none;font-family:'Manrope';font-weight:600}
+  .btn.block{width:100%;margin-top:14px}
+  .err{color:#d6006a;font-size:13px;margin-top:12px;min-height:18px}
+  /* en-tête */
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .hactions{display:flex;gap:10px;flex-wrap:wrap}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 20px}
+  /* finances */
+  .finances{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .tile .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .tile .v{font-family:'Sora',sans-serif;font-weight:800;font-size:22px;margin-top:4px}
+  .tile.net .v{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .breakdown{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .pill{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+  .pill b{color:var(--txt)}
+  /* filtres */
+  .filters{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .frow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .frow .flab{font-size:12px;color:var(--muted);margin-right:2px}
+  .chip{cursor:pointer;font-size:13px;font-weight:600;padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted);transition:.15s}
+  .chip.on{background:var(--card2);color:var(--txt);border-color:var(--violet)}
+  /* statut couleurs */
+  .st-a-traiter{background:#fff5e6;color:#b26a00;border:1px solid #ffe2b3}
+  .st-en-cours{background:#f0eaff;color:#6d34d6;border:1px solid #ddccff}
+  .st-livree{background:#e7f8f1;color:#0f9d63;border:1px solid #b7ecd5}
+  .st-remboursee{background:#ffe9f1;color:#b3245f;border:1px solid #ffc9dd}
+  /* cartes */
+  .list{display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 12px 30px -24px rgba(90,50,140,.35)}
+  .ctop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .cnum{font-family:'Sora',sans-serif;font-weight:800;font-size:16px}
+  .cmail{color:var(--muted);font-size:13.5px;margin-top:2px;word-break:break-all}
+  .cdate{color:var(--muted);font-size:12px;margin-top:2px}
+  .badge{font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;white-space:nowrap}
+  .b-form{font-size:12px;font-weight:700;padding:5px 11px;border-radius:8px;background:var(--card2);color:#6d34d6;border:1px solid var(--line);display:inline-block}
+  .lignes{margin:12px 0;font-size:13.5px}
+  .ligne{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+  .ligne .bump{font-size:11px;color:var(--muted);font-weight:600;border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-left:6px}
+  .total{display:flex;justify-content:space-between;border-top:1px dashed var(--line);margin-top:6px;padding-top:8px;font-weight:800;font-family:'Sora',sans-serif}
+  .chanson{background:#fbf8ff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px}
+  .chanson .ch-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+  .ch-ok{color:#0f9d63;font-weight:700}
+  .ch-wait{color:#b26a00;font-weight:700}
+  .ch-cat{color:var(--muted)}
+  .ch-note{color:var(--muted);font-size:11.5px}
+  .histoire-btn{margin-left:auto;cursor:pointer;background:none;border:none;color:var(--violet);font-weight:700;font-size:12.5px;font-family:'Manrope'}
+  .histoire-body{display:none;white-space:pre-wrap;font-size:12.5px;color:var(--txt);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;line-height:1.5}
+  .histoire-body.show{display:block}
+  .stbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .stbtn{cursor:pointer;font-size:12.5px;font-weight:700;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--muted);font-family:'Manrope';transition:.15s}
+  .stbtn.active{border-color:transparent}
+  .stbtn:disabled{opacity:.5;cursor:wait}
+  .empty,.spin{text-align:center;color:var(--muted);padding:50px 18px;border:1px dashed var(--line);border-radius:16px}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#fff;border:1px solid var(--line);box-shadow:0 12px 30px -14px rgba(90,50,140,.5);padding:12px 18px;border-radius:12px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;max-width:90%}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(max-width:560px){ .finances{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ÉCRAN MOT DE PASSE -->
+  <div id="gate" class="gate">
+    <div class="logo">STORY<span class="b">BEAT</span></div>
+    <h1>Carnet des commandes</h1>
+    <p>Espace privé. Entre ton mot de passe pour accéder à tes commandes.</p>
+    <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="btn block" id="go">Ouvrir le carnet</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+
+  <!-- APP -->
+  <div id="app" style="display:none">
+    <header>
+      <div class="logo">STORY<span class="b">BEAT</span> · Carnet</div>
+      <div class="hactions">
+        <button class="btn" id="refresh">🔄 Mettre à jour</button>
+        <button class="btn ghost" id="logout">Se déconnecter</button>
+      </div>
+    </header>
+    <div class="sub" id="sub">Tableau de bord des commandes</div>
+
+    <div class="finances" id="finances"></div>
+    <div class="breakdown" id="breakdown"></div>
+
+    <div class="filters">
+      <div class="frow" id="fStatut"><span class="flab">Statut :</span></div>
+      <div class="frow" id="fQuest"><span class="flab">Questionnaire :</span></div>
+    </div>
+
+    <div class="list" id="list"><div class="spin">Chargement…</div></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var API_LIST  = '/api/carnet-list';
+  var API_BUILD = '/api/build-commandes';
+  var API_SET   = '/api/set-statut';
+  var STATUTS = ['à traiter','en cours','livrée','remboursée'];
+
+  var PW = '';
+  var STATE = { all: [], fStatut: 'tous', fQuest: 'tous' };
+  var $ = function(s){ return document.querySelector(s); };
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function eur(n){ return (Number(n)||0).toFixed(2).replace('.',',')+' €'; }
+  function statutClass(s){ return 'st-' + String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]+/gi,'-').toLowerCase(); }
+  function dateFr(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso; } }
+  function formuleClass(f){ return 'b-form'; }
+  function questComplet(f){ return Array.isArray(f.chansons) && f.chansons.length>0 && f.chansons.every(function(c){ return c.questionnaire==='présent'; }); }
+  function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._x); t._x=setTimeout(function(){ t.classList.remove('show'); }, 2600); }
+
+  // ---------- chargement ----------
+  function load(){
+    $('#list').innerHTML = '<div class="spin">Chargement…</div>';
+    fetch(API_LIST, { headers: { 'x-tool-password': PW } })
+      .then(function(r){ if(r.status===401){ logout('Mot de passe incorrect.'); throw new Error('401'); } return r.json(); })
+      .then(function(d){
+        if(!d.ok){ $('#list').innerHTML = '<div class="empty">Erreur : '+esc(d.error||'inconnue')+'</div>'; return; }
+        // on ne garde que les vraies fiches commandes (celles qui ont un order_id)
+        STATE.all = (d.commandes||[]).filter(function(c){ return c.order_id!=null; });
+        renderFinances(); renderFilters(); renderList();
+      })
+      .catch(function(e){ if(e.message!=='401') $('#list').innerHTML = '<div class="empty">Impossible de contacter le carnet. Réessaie.</div>'; });
+  }
+
+  // ---------- finances ----------
+  function renderFinances(){
+    var all = STATE.all;
+    var net = 0, rembourse = 0;
+    var parStatut = { 'à traiter':0, 'en cours':0, 'livrée':0, 'remboursée':0 };
+    all.forEach(function(c){
+      var m = Number(c.montant_total_eur)||0;
+      if(c.statut==='remboursée') rembourse += m; else net += m;
+      if(parStatut[c.statut]!==undefined) parStatut[c.statut]++;
+    });
+    $('#finances').innerHTML =
+      '<div class="tile net"><div class="k">💶 Encaissé net</div><div class="v">'+eur(net)+'</div></div>'+
+      '<div class="tile"><div class="k">🧾 Commandes</div><div class="v">'+all.length+'</div></div>'+
+      '<div class="tile"><div class="k">↩️ Total remboursé</div><div class="v">'+eur(rembourse)+'</div></div>';
+    $('#breakdown').innerHTML = STATUTS.map(function(s){
+      return '<span class="pill">'+esc(s)+' : <b>'+(parStatut[s]||0)+'</b></span>';
+    }).join('');
+  }
+
+  // ---------- filtres ----------
+  function renderFilters(){
+    var st = ['tous'].concat(STATUTS);
+    $('#fStatut').innerHTML = '<span class="flab">Statut :</span>' + st.map(function(s){
+      return '<span class="chip'+(STATE.fStatut===s?' on':'')+'" data-f="statut" data-v="'+esc(s)+'">'+esc(s==='tous'?'Tous':s)+'</span>';
+    }).join('');
+    var q = [['tous','Tous'],['complet','Complet'],['attente','En attente ⏳']];
+    $('#fQuest').innerHTML = '<span class="flab">Questionnaire :</span>' + q.map(function(p){
+      return '<span class="chip'+(STATE.fQuest===p[0]?' on':'')+'" data-f="quest" data-v="'+p[0]+'">'+esc(p[1])+'</span>';
+    }).join('');
+  }
+
+  function filtered(){
+    return STATE.all.filter(function(c){
+      if(STATE.fStatut!=='tous' && c.statut!==STATE.fStatut) return false;
+      if(STATE.fQuest==='complet' && !questComplet(c)) return false;
+      if(STATE.fQuest==='attente' && questComplet(c)) return false;
+      return true;
+    }).sort(function(a,b){
+      var da=(a.date||a._maj_le||''), db=(b.date||b._maj_le||'');
+      return da<db?1:(da>db?-1:0); // récent → ancien
+    });
+  }
+
+  // ---------- rendu d'une carte ----------
+  function cardHTML(c){
+    var lignes = (c.lignes||[]).map(function(l){
+      return '<div class="ligne"><span>'+esc(l.nom)+(l.bump?'<span class="bump">bump</span>':'')+'</span><span>'+eur(l.montant_eur)+'</span></div>';
+    }).join('');
+    var chansons = (c.chansons||[]).map(function(ch){
+      var present = ch.questionnaire==='présent';
+      var head = '<div class="ch-top"><b>Chanson '+ch.numero+'</b>'+
+        (present ? '<span class="ch-ok">✅ questionnaire présent</span>' : '<span class="ch-wait">⏳ en attente</span>')+
+        (present && ch.categorie ? '<span class="ch-cat">· '+esc(ch.categorie)+'</span>' : '')+
+        (present && ch.chanson_precisee===false ? '<span class="ch-note">(n° non précisé)</span>' : '')+
+        (present && ch.histoire ? '<button class="histoire-btn" data-hist>Voir l\'histoire ▾</button>' : '')+
+        '</div>';
+      var body = (present && ch.histoire) ? '<div class="histoire-body">'+esc(ch.histoire)+'</div>' : '';
+      return '<div class="chanson">'+head+body+'</div>';
+    }).join('');
+    var stbtns = STATUTS.map(function(s){
+      var active = (c.statut===s);
+      return '<button class="stbtn'+(active?' active '+statutClass(s):'')+'" data-st="'+esc(s)+'"'+(active?' disabled':'')+'>'+esc(s)+'</button>';
+    }).join('');
+    return ''+
+      '<div class="ctop">'+
+        '<div><div class="cnum">Commande #'+esc(c.order_id)+'</div>'+
+          '<div class="cmail">'+esc(c.email||'—')+'</div>'+
+          '<div class="cdate">'+esc(dateFr(c.date))+'</div></div>'+
+        '<span class="badge '+statutClass(c.statut)+'">'+esc(c.statut||'—')+'</span>'+
+      '</div>'+
+      '<div style="margin-top:10px"><span class="b-form">'+esc(c.formule||'—')+'</span></div>'+
+      '<div class="lignes">'+lignes+'<div class="total"><span>Total</span><span>'+eur(c.montant_total_eur)+'</span></div></div>'+
+      chansons+
+      '<div class="stbtns">'+stbtns+'</div>';
+  }
+
+  function renderList(){
+    var list = filtered();
+    var el = $('#list');
+    if(!list.length){ el.innerHTML = '<div class="empty">Aucune commande pour ce filtre.</div>'; return; }
+    el.innerHTML = list.map(function(c){
+      return '<div class="card" data-order="'+esc(c.order_id)+'">'+cardHTML(c)+'</div>';
+    }).join('');
+  }
+
+  function findCardEl(order){ return document.querySelector('.card[data-order="'+String(order).replace(/"/g,'')+'"]'); }
+
+  // ---------- changement de statut (carte seule) ----------
+  function setStatut(order, statut, cardEl){
+    var btns = cardEl.querySelectorAll('.stbtn');
+    btns.forEach(function(b){ b.disabled=true; });
+    fetch(API_SET, {
+      method:'POST',
+      headers:{ 'x-tool-password':PW, 'Content-Type':'application/json' },
+      body: JSON.stringify({ order_id: order, statut: statut })
+    }).then(function(r){ if(r.status===401){ logout('Mot de passe incorrect.'); throw new Error('401'); } return r.json(); })
+      .then(function(d){
+        if(!d.ok){ toast('❌ '+(d.error||'Échec')); btns.forEach(function(b){ b.disabled=false; }); return; }
+        // maj du modèle en mémoire
+        var c = STATE.all.filter(function(x){ return String(x.order_id)===String(order); })[0];
+        if(c) c.statut = statut;
+        toast('✅ Commande #'+order+' → '+statut);
+        // rafraîchir la carte seule (ou la retirer si un filtre statut l'exclut)
+        if(STATE.fStatut!=='tous' && STATE.fStatut!==statut){ if(cardEl) cardEl.remove(); }
+        else if(c && cardEl){ cardEl.innerHTML = cardHTML(c); }
+        renderFinances(); renderFilters();
+      })
+      .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btns.forEach(function(b){ b.disabled=false; }); } });
+  }
+
+  // ---------- délégation d'événements sur la liste ----------
+  $('#list').addEventListener('click', function(e){
+    var histBtn = e.target.closest ? e.target.closest('.histoire-btn') : null;
+    if(histBtn){ var body = histBtn.closest('.chanson').querySelector('.histoire-body'); if(body){ body.classList.toggle('show'); histBtn.textContent = body.classList.contains('show') ? 'Masquer l\'histoire ▴' : 'Voir l\'histoire ▾'; } return; }
+    var st = e.target.closest ? e.target.closest('.stbtn') : null;
+    if(st && !st.disabled){ var card = st.closest('.card'); setStatut(card.getAttribute('data-order'), st.getAttribute('data-st'), card); }
+  });
+
+  // ---------- filtres (délégation) ----------
+  document.getElementById('fStatut').addEventListener('click', onFilter);
+  document.getElementById('fQuest').addEventListener('click', onFilter);
+  function onFilter(e){
+    var chip = e.target.closest ? e.target.closest('.chip') : null;
+    if(!chip) return;
+    if(chip.getAttribute('data-f')==='statut') STATE.fStatut = chip.getAttribute('data-v');
+    else STATE.fQuest = chip.getAttribute('data-v');
+    renderFilters(); renderList();
+  }
+
+  // ---------- bouton "Mettre à jour" (parser) ----------
+  $('#refresh').addEventListener('click', function(){
+    var b = $('#refresh'); var old = b.textContent; b.disabled=true; b.textContent='⏳ Mise à jour…';
+    fetch(API_BUILD, { method:'POST', headers:{ 'x-tool-password':PW } })
+      .then(function(r){ if(r.status===401){ logout('Mot de passe incorrect.'); throw new Error('401'); } return r.json(); })
+      .then(function(d){
+        if(!d.ok){ toast('❌ '+(d.error||'Échec')); return; }
+        var s = d.resume||{};
+        toast('✅ '+(s.creees||0)+' créée(s), '+(s.mises_a_jour||0)+' MAJ, '+(s.inchangees||0)+' inchangée(s)');
+        load();
+      })
+      .catch(function(e){ if(e.message!=='401') toast('❌ Problème réseau'); })
+      .finally(function(){ b.disabled=false; b.textContent=old; });
+  });
+
+  // ---------- session ----------
+  function enter(pw){ PW = pw; try{ localStorage.setItem('sb_carnet_pw', pw); }catch(e){} $('#gate').style.display='none'; $('#app').style.display='block'; load(); }
+  function logout(msg){ PW=''; try{ localStorage.removeItem('sb_carnet_pw'); }catch(e){} $('#app').style.display='none'; $('#gate').style.display='block'; $('#pw').value=''; $('#gateErr').textContent = msg||''; }
+  $('#go').addEventListener('click', function(){ var pw=$('#pw').value.trim(); if(!pw){ $('#gateErr').textContent='Entre ton mot de passe.'; return; } $('#gateErr').textContent=''; enter(pw); });
+  $('#pw').addEventListener('keydown', function(e){ if(e.key==='Enter') $('#go').click(); });
+  $('#logout').addEventListener('click', function(){ logout(); });
+  (function(){ var saved=''; try{ saved=localStorage.getItem('sb_carnet_pw')||''; }catch(e){} if(saved) enter(saved); })();
+</script>
+</body>
+</html>
