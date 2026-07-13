@@ -50,6 +50,11 @@ textarea{min-height:300px;resize:vertical}
 .slot-status .manual{font-weight:400;color:var(--muted);margin-top:6px;font-size:12.5px;line-height:1.6}
 .slot-status .manual b{color:var(--white)}
 .slot-status .manual-btns{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.slot-listen{margin-top:8px}
+.slot-listen .lbl{font-size:12px;color:var(--muted);margin-bottom:4px}
+.slot-listen audio{width:100%}
+.slot-listen a{color:var(--violet);font-weight:700;font-size:13px;text-decoration:none}
+.slot-hint{font-size:11.5px;color:var(--muted);margin-top:6px}
 </style>
 </head>
 <body>
@@ -100,7 +105,7 @@ textarea{min-height:300px;resize:vertical}
 
   <div class="phase2">
     <label class="q">📤 Envoyer les fichiers sur Bunny <span class="hint">(chaque case impose le bon nom — rien à renommer)</span></label>
-    <div class="hintsmall">Max 4,4 Mo par fichier (limite technique Vercel de 4,5 Mo). Chaque fichier part automatiquement dans le dossier <b id="slotFolder">—</b></div>
+    <div class="hintsmall">Envoi direct sur Bunny — <b>gros fichiers vidéo acceptés, sans limite de taille</b>. Chaque fichier part automatiquement dans le dossier <b id="slotFolder">—</b></div>
     <div id="slots" class="slots"></div>
   </div>
 </div>
@@ -179,15 +184,18 @@ const slotEls=SLOTS.map(cfg=>{
     +'<div class="slot-name"></div>'
     +'<div class="dz">📤 Glisse le fichier ici, ou <span class="pick">clique pour choisir</span></div>'
     +'<input type="file" accept="audio/*,video/*" hidden>'
-    +'<div class="slot-status muted"></div>';
+    +'<div class="slot-status muted"></div>'
+    +'<div class="slot-listen"></div>';
   const dz=el.querySelector('.dz');
   const input=el.querySelector('input');
   const statusEl=el.querySelector('.slot-status');
+  const listenEl=el.querySelector('.slot-listen');
+  const st={uploaded:false};
   dz.onclick=()=>input.click();
   ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
   ['dragleave','dragend','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
-  dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)sendToSlot(cfg,f,statusEl);});
-  input.addEventListener('change',()=>{const f=input.files&&input.files[0];if(f)sendToSlot(cfg,f,statusEl);input.value='';});
+  dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)sendToSlot(cfg,f,statusEl,listenEl,st);});
+  input.addEventListener('change',()=>{const f=input.files&&input.files[0];if(f)sendToSlot(cfg,f,statusEl,listenEl,st);input.value='';});
   slotsWrap.appendChild(el);
   return {cfg, el, nameEl:el.querySelector('.slot-name'), statusEl};
 });
@@ -226,12 +234,13 @@ idEl.addEventListener('input',()=>{ idEl.dataset.coded=''; });
 idEl.addEventListener('blur',()=>{ if(!idEl.dataset.coded && slug(idEl.value)) makeUnique(false); });
 const genBtn=document.getElementById('genUnique');
 if(genBtn) genBtn.onclick=()=>makeUnique(true);
-async function sendToSlot(cfg,file,statusEl){
+async function sendToSlot(cfg,file,statusEl,listenEl,st){
   const folder=slug(val('id'));
   if(!folder){ statusEl.className='slot-status err'; statusEl.textContent="❌ Renseigne d'abord l'Identifiant."; return; }
   const fn=folder+'-'+cfg.suffix+'.'+currentExt();
   const path=folder+'/'+fn;
-  statusEl.className='slot-status wait'; statusEl.textContent='Préparation… ('+humanSize(file.size)+')';
+  const remplace = st && st.uploaded;
+  statusEl.className='slot-status wait'; statusEl.textContent=(remplace?'Remplacement…':'Préparation…')+' ('+humanSize(file.size)+')';
   try{
     const signResp=await fetch('/api/sign-upload?name='+encodeURIComponent(path),{
       method:'POST',
@@ -242,7 +251,20 @@ async function sendToSlot(cfg,file,statusEl){
     statusEl.className='slot-status wait'; statusEl.textContent='Envoi en cours… ('+humanSize(file.size)+')';
     const up=await fetch(signData.uploadUrl,{ method:'PUT', body:file });
     if(up.status!==200 && up.status!==201){ let t=''; try{t=await up.text();}catch(e){} throw new Error('Bunny '+up.status+(t?' : '+t.slice(0,200):'')); }
-    statusEl.className='slot-status ok'; statusEl.textContent='✅ Envoyé — '+path+' ('+humanSize(file.size)+')';
+    const now=new Date(), p2=n=>String(n).padStart(2,'0'), hhmm=p2(now.getHours())+':'+p2(now.getMinutes());
+    statusEl.className='slot-status ok';
+    statusEl.textContent=(remplace?('🔁 Remplacé (à '+hhmm+')'):('✅ Envoyé (à '+hhmm+')'))+' — '+humanSize(file.size);
+    if(st) st.uploaded=true;
+    // Bouton "écouter" : vérifier ce qui est RÉELLEMENT en ligne sur Bunny (anti-cache ?t=)
+    if(listenEl){
+      const url=(signData.publicUrl||('https://storybeat.b-cdn.net/'+path))+'?t='+Date.now();
+      const hint='<div class="slot-hint">Tu peux glisser un autre fichier ici pour le remplacer.</div>';
+      if(currentExt()==='mp4'){
+        listenEl.innerHTML='<a href="'+url+'" target="_blank" rel="noopener">▶ Ouvrir la vidéo</a>'+hint;
+      }else{
+        listenEl.innerHTML='<div class="lbl">▶ Écoute la version en ligne :</div><audio controls preload="none" src="'+url+'"></audio>'+hint;
+      }
+    }
   }catch(e){
     statusEl.className='slot-status err'; statusEl.textContent='❌ '+e.message;
   }
