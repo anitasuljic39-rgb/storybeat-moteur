@@ -70,6 +70,7 @@ textarea{min-height:300px;resize:vertical}
       <label><input type="radio" name="type" value="audio" checked> 🎧 Audio (MP3)</label>
       <label><input type="radio" name="type" value="video"> 🎬 Vidéo (MP4)</label>
     </div>
+    <label class="check" id="premiumWrap"><input type="checkbox" id="premium"> 📸 Premium — la cliente enverra ses photos/vidéos (montage)</label>
   </div>
   <div class="grp"><label class="q">Titre — Version A</label><input id="titreA" placeholder="Ex : Ma prière exaucée"></div>
   <div class="grp" id="grpTitreB"><label class="q">Titre — Version B</label><input id="titreB" placeholder="Ex : Mon miracle"></div>
@@ -89,6 +90,10 @@ textarea{min-height:300px;resize:vertical}
     <div id="o-finals"></div>
     <h3>📩 À envoyer à la cliente</h3>
     <div class="send">Le SEUL lien à transmettre :<br><a id="o-valid" href="#" target="_blank"></a> <button class="btn copy" type="button" id="copyValid">Copier</button></div>
+    <div id="o-photos-wrap" style="display:none">
+      <h3>📸 Lien photos à envoyer à la cliente (Premium)</h3>
+      <div class="send">Lien d'envoi de ses photos/vidéos :<br><a id="o-photos" href="#" target="_blank"></a> <button class="btn copy" type="button" id="copyPhotos">Copier</button></div>
+    </div>
   </div>
 
   <div class="phase2">
@@ -121,7 +126,8 @@ document.getElementById('go').onclick=async()=>{
     versions:radio('versions'), type:radio('type'),
     titreA:val('titreA'), titreB:val('titreB'), pour:val('pour'),
     parolesA:val('parolesA'),
-    parolesB:(two && !document.getElementById('sameParoles').checked)?val('parolesB'):''
+    parolesB:(two && !document.getElementById('sameParoles').checked)?val('parolesB'):'',
+    premium:document.getElementById('premium').checked
   };
   btn.disabled=true;btn.textContent='⏳ Publication en cours…';
   try{
@@ -135,6 +141,13 @@ document.getElementById('go').onclick=async()=>{
       '<div style="margin-bottom:8px;font-size:14px">'+l.label+' : <a href="'+l.url+'" target="_blank">'+l.url+'</a></div>').join('');
     const va=document.getElementById('o-valid');va.href=data.validationLink;va.textContent=data.validationLink;
     document.getElementById('copyValid').onclick=()=>navigator.clipboard.writeText(data.validationLink).then(()=>toast('Lien copié !'));
+    if(data.clientUploadLink){
+      const ph=document.getElementById('o-photos');ph.href=data.clientUploadLink;ph.textContent=data.clientUploadLink;
+      document.getElementById('copyPhotos').onclick=()=>navigator.clipboard.writeText(data.clientUploadLink).then(()=>toast('Lien photos copié !'));
+      document.getElementById('o-photos-wrap').style.display='block';
+    }else{
+      document.getElementById('o-photos-wrap').style.display='none';
+    }
     document.getElementById('out').classList.add('show');
     document.getElementById('out').scrollIntoView({behavior:'smooth'});
   }catch(e){

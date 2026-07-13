@@ -1,9 +1,11 @@
+const crypto = require('crypto');
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
   body = body || {};
-  const { password, id, prenom, versions, type, titreA, titreB, pour, parolesA, parolesB } = body;
+  const { password, id, prenom, versions, type, titreA, titreB, pour, parolesA, parolesB, premium } = body;
   if (!password || password !== process.env.TOOL_PASSWORD) {
     res.status(401).json({ error: 'Mot de passe incorrect.' }); return;
   }
@@ -63,9 +65,20 @@ module.exports = async (req, res) => {
   const finalLinks = [{ label: two ? 'Version A' : 'Version unique', url: SITE + '/?id=' + cleanId + '-a' }];
   if (two) finalLinks.push({ label: 'Version B', url: SITE + '/?id=' + cleanId + '-b' });
   const validationLink = SITE + '/valider/?id=' + cleanId + '-choix';
+  // Lien d'upload photos/vidéos pour les commandes Premium (uniquement si la case est cochée).
+  // Même recette de jeton que api/client-sign-upload.js : HMAC("premium/"+cleanId) avec CLIENT_UPLOAD_SECRET.
+  let clientUploadLink = '';
+  const CLIENT_SECRET = process.env.CLIENT_UPLOAD_SECRET;
+  if (premium && CLIENT_SECRET) {
+    const token = crypto.createHmac('sha256', CLIENT_SECRET).update('premium/' + cleanId, 'utf8').digest('hex').slice(0, 32);
+    const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString();
+    const base = process.env.MOTEUR_BASE || (host ? 'https://' + host : 'https://storybeat-moteur.vercel.app');
+    clientUploadLink = base + '/upload-photos.html?c=' + encodeURIComponent(cleanId) + '&t=' + token;
+  }
   res.status(200).json({
     ok: true, folder: cleanId, ext: ext,
     filesToUpload: filesToUpload, finalLinks: finalLinks,
-    validationLink: validationLink, committed: fiches.map(f => f.path)
+    validationLink: validationLink, committed: fiches.map(f => f.path),
+    clientUploadLink: clientUploadLink
   });
 };
