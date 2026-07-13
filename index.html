@@ -6,7 +6,7 @@
 <title>StoryBeat — Moteur</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&display=swap');
-:root{--bg:#0b0a10;--card:#1c1926;--card2:#26212f;--pink:#ff3aa8;--violet:#9b4dff;--cyan:#1fd6ff;--white:#fff;--muted:rgba(255,255,255,.62);--line:rgba(255,255,255,.14);--grad3:linear-gradient(90deg,#ff3aa8,#9b4dff,#1fd6ff);--display:'Sora',sans-serif;--body:'Manrope',sans-serif;}
+:root{--bg:#faf7ff;--card:#ffffff;--card2:#f3eefb;--pink:#ff3aa8;--violet:#9b4dff;--cyan:#1fd6ff;--white:#211a33;--muted:#6b6480;--line:#e3d9f5;--grad3:linear-gradient(90deg,#ff3aa8,#9b4dff,#1fd6ff);--display:'Sora',sans-serif;--body:'Manrope',sans-serif;}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--white);font-family:var(--body);padding:30px 18px 70px;min-height:100vh}
 .wrap{max-width:640px;margin:0 auto}
@@ -16,6 +16,8 @@ h1{font-family:var(--display);font-weight:800;font-size:26px;margin-bottom:4px}
 label.q{display:block;font-weight:600;font-size:14px;margin-bottom:7px}
 label.q .hint{color:var(--muted);font-weight:400;font-size:12px}
 input,textarea,select{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--white);font-family:var(--body);font-size:15px;padding:12px 14px}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--violet)}
+input::placeholder,textarea::placeholder{color:#a79dbf}
 textarea{min-height:300px;resize:vertical}
 .row2{display:flex;gap:12px;flex-wrap:wrap}.row2>div{flex:1 1 220px}
 .radio{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
@@ -25,12 +27,12 @@ textarea{min-height:300px;resize:vertical}
 .check input{width:auto}
 .btn{border:none;cursor:pointer;font-family:var(--display);font-weight:700;border-radius:12px;padding:14px 22px;font-size:16px;background:var(--grad3);color:#fff;box-shadow:0 12px 30px -10px rgba(155,77,255,.6)}
 .btn:disabled{opacity:.5;cursor:wait}
-.btn.copy{background:var(--card2);border:1px solid var(--line);font-family:var(--body);font-weight:600;font-size:12px;padding:6px 10px;box-shadow:none}
-.err{color:#ff6b8a;font-size:14px;margin-top:10px;display:none}.err.show{display:block}
-.out{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:none}.out.show{display:block}
+.btn.copy{background:var(--card2);border:1px solid var(--line);color:#4a3f66;font-family:var(--body);font-weight:600;font-size:12px;padding:6px 10px;box-shadow:none}
+.err{color:#d6006a;font-size:14px;margin-top:10px;display:none}.err.show{display:block}
+.out{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:none;box-shadow:0 12px 30px -22px rgba(90,50,140,.35)}.out.show{display:block}
 .out h3{font-family:var(--display);font-size:17px;margin:16px 0 10px}.out h3:first-child{margin-top:0}
-.out .file{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#000;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:13px;word-break:break-all}
-.out a{color:var(--cyan);word-break:break-all}
+.out .file{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:13px;word-break:break-all}
+.out a{color:var(--violet);word-break:break-all}
 .send{background:linear-gradient(var(--card2),var(--card2)) padding-box,var(--grad3) border-box;border:1.5px solid transparent;border-radius:12px;padding:14px;margin-top:8px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--card2);border:1px solid var(--line);padding:12px 20px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.3s}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .phase2{margin-top:34px;border-top:1px solid var(--line);padding-top:26px}
@@ -42,9 +44,9 @@ textarea{min-height:300px;resize:vertical}
 .slot-name{font-size:12px;color:var(--muted);margin-bottom:10px;word-break:break-all}
 .slot .dz{border:1.5px dashed var(--line);border-radius:12px;padding:16px;text-align:center;cursor:pointer;font-size:13px;color:var(--muted);transition:border-color .2s,background .2s}
 .slot .dz.drag{border-color:var(--pink);background:var(--card2)}
-.slot .dz .pick{color:var(--cyan);text-decoration:underline}
+.slot .dz .pick{color:var(--violet);text-decoration:underline}
 .slot-status{font-size:13px;margin-top:8px;font-weight:600;min-height:18px;word-break:break-all}
-.slot-status.ok{color:#4ade80}.slot-status.err{color:#ff6b8a}.slot-status.wait,.slot-status.muted{color:var(--muted)}
+.slot-status.ok{color:#0f9d63}.slot-status.err{color:#d6006a}.slot-status.wait,.slot-status.muted{color:var(--muted)}
 .slot-status .manual{font-weight:400;color:var(--muted);margin-top:6px;font-size:12.5px;line-height:1.6}
 .slot-status .manual b{color:var(--white)}
 .slot-status .manual-btns{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
@@ -202,6 +204,11 @@ function refreshSlots(){
 document.getElementById('id').addEventListener('input',refreshSlots);
 document.querySelectorAll('input[name="type"],input[name="versions"]').forEach(r=>r.addEventListener('change',refreshSlots));
 refreshSlots();
+// La case Premium suit le type : Vidéo (MP4) => Premium coché, Audio (MP3) => décoché.
+// Reste modifiable à la main ensuite (le pilotage auto ne rejoue qu'au prochain changement de type).
+document.querySelectorAll('input[name="type"]').forEach(r=>r.addEventListener('change',()=>{
+  document.getElementById('premium').checked = (radio('type')==='video');
+}));
 // ===== Identifiant unique automatique (anti-collision) =====
 function uniqueCode(){ return Math.random().toString(36).slice(2,6); }
 const idEl=document.getElementById('id');
