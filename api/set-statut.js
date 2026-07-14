@@ -41,12 +41,15 @@ module.exports = async (req, res) => {
   // anti-piège chemin : uniquement chiffres/lettres/tirets (couvre aussi les clés "sans-id-...")
   if (!/^[a-zA-Z0-9-]+$/.test(orderRaw)) { res.status(400).json({ error: 'Numéro de commande invalide.' }); return; }
 
-  // statut ET prod_id sont OPTIONNELS : on fournit l'un OU l'autre (ou les deux).
+  // statut, prod_id ET prod_id_2 sont OPTIONNELS : on fournit l'un OU l'autre (ou plusieurs).
+  // prod_id_2 = identifiant de la 2e chanson d'une commande order bump (optionnel, rétrocompatible).
   const statut = (p.statut != null && String(p.statut).trim() !== '') ? String(p.statut).trim() : null;
   const prodId = (p.prod_id != null && String(p.prod_id).trim() !== '')
     ? String(p.prod_id).trim().toLowerCase().replace(/[^a-z0-9-]/g, '') : null;
-  if (statut === null && !prodId) {
-    res.status(400).json({ error: 'Rien à mettre à jour (statut ou prod_id requis).' }); return;
+  const prodId2 = (p.prod_id_2 != null && String(p.prod_id_2).trim() !== '')
+    ? String(p.prod_id_2).trim().toLowerCase().replace(/[^a-z0-9-]/g, '') : null;
+  if (statut === null && !prodId && !prodId2) {
+    res.status(400).json({ error: 'Rien à mettre à jour (statut, prod_id ou prod_id_2 requis).' }); return;
   }
   if (statut !== null && STATUTS.indexOf(statut) === -1) {
     res.status(400).json({ error: 'Statut invalide (attendus : ' + STATUTS.join(' / ') + ').' }); return;
@@ -74,10 +77,12 @@ module.exports = async (req, res) => {
     const now = new Date().toISOString();
     if (statut !== null) { fiche.statut = statut; fiche._statut_maj_le = now; }
     if (prodId) { fiche.prod_id = prodId; fiche._prod_maj_le = now; }
+    if (prodId2) { fiche.prod_id_2 = prodId2; fiche._prod2_maj_le = now; }
 
     const changes = [];
     if (statut !== null) changes.push('statut → ' + statut);
     if (prodId) changes.push('prod_id → ' + prodId);
+    if (prodId2) changes.push('prod_id_2 → ' + prodId2);
 
     // 3) réécrire en place (avec sha → pas de doublon)
     const putR = await fetch(url, {
@@ -92,7 +97,7 @@ module.exports = async (req, res) => {
     });
     if (!putR.ok) { const e = await putR.json().catch(()=>({})); res.status(502).json({ error: 'Écriture GitHub ' + putR.status + ' : ' + (e.message||'') }); return; }
 
-    res.status(200).json({ ok: true, order_id: orderRaw, ancien_statut: ancien, nouveau_statut: statut, prod_id: fiche.prod_id || null });
+    res.status(200).json({ ok: true, order_id: orderRaw, ancien_statut: ancien, nouveau_statut: statut, prod_id: fiche.prod_id || null, prod_id_2: fiche.prod_id_2 || null });
   } catch (e) {
     res.status(500).json({ error: 'Erreur : ' + e.message });
   }
