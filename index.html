@@ -218,15 +218,16 @@ document.getElementById('go').onclick=async()=>{
     if(commandeId){
       const bn=document.getElementById('cmdBanner');
       try{
-        const rs=await fetch('/api/set-statut',{method:'POST',headers:{'x-tool-password':val('password'),'Content-Type':'application/json'},body:JSON.stringify({order_id:commandeId,prod_id:data.folder})});
+        const payload={order_id:commandeId}; payload[prodField()]=data.folder;
+        const rs=await fetch('/api/set-statut',{method:'POST',headers:{'x-tool-password':val('password'),'Content-Type':'application/json'},body:JSON.stringify(payload)});
         const rd=await rs.json().catch(()=>({}));
         if(rs.ok && rd.ok){
-          if(bn){ bn.style.background='#e7f8f1'; bn.style.borderColor='#b7ecd5'; bn.style.color='#0f7a4e'; bn.textContent='✅ Identifiant '+data.folder+' enregistré dans la commande #'+commandeId+'.'; }
+          if(bn){ bn.style.background='#e7f8f1'; bn.style.borderColor='#b7ecd5'; bn.style.color='#0f7a4e'; bn.textContent='✅ Identifiant '+data.folder+' enregistré dans '+cmdLabel()+'.'; }
         } else {
-          if(bn){ bn.style.background='#fff5e6'; bn.style.borderColor='#ffe2b3'; bn.style.color='#b26a00'; bn.textContent='⚠️ Fiches publiées ✅ — mais l’identifiant n’a pas pu être enregistré dans la commande #'+commandeId+' ('+(rd.error||('erreur '+rs.status))+'). Tu peux le saisir à la main dans le carnet.'; }
+          if(bn){ bn.style.background='#fff5e6'; bn.style.borderColor='#ffe2b3'; bn.style.color='#b26a00'; bn.textContent='⚠️ Fiches publiées ✅ — mais l’identifiant n’a pas pu être enregistré dans '+cmdLabel()+' ('+(rd.error||('erreur '+rs.status))+'). Tu peux le saisir à la main dans le carnet.'; }
         }
       }catch(e){
-        if(bn){ bn.style.background='#fff5e6'; bn.style.borderColor='#ffe2b3'; bn.style.color='#b26a00'; bn.textContent='⚠️ Fiches publiées ✅ — mais l’enregistrement dans la commande #'+commandeId+' a échoué (réseau). Tu peux le saisir à la main dans le carnet.'; }
+        if(bn){ bn.style.background='#fff5e6'; bn.style.borderColor='#ffe2b3'; bn.style.color='#b26a00'; bn.textContent='⚠️ Fiches publiées ✅ — mais l’enregistrement dans '+cmdLabel()+' a échoué (réseau). Tu peux le saisir à la main dans le carnet.'; }
       }
     }
     document.getElementById('out').classList.add('show');
@@ -446,12 +447,20 @@ document.getElementById('karPubBtn').onclick=async()=>{
 karRefreshGate();
 
 // ===== Niveau 1 : lien carnet → Moteur (produire une commande précise) =====
-let commandeId='';
+let commandeId='', chansonNum='';
+// Champ à écrire dans la fiche : chanson 2 → prod_id_2, sinon (1 ou absent) → prod_id.
+function prodField(){ return chansonNum==='2' ? 'prod_id_2' : 'prod_id'; }
+// Libellé de ce qu'on produit, pour les bandeaux.
+function cmdLabel(){
+  return (chansonNum==='2') ? 'la Chanson 2 de la commande #'+commandeId
+       : (chansonNum==='1') ? 'la Chanson 1 de la commande #'+commandeId
+       : 'la commande #'+commandeId;
+}
 (function(){
-  try{ commandeId=(new URLSearchParams(location.search).get('commande')||'').trim(); }catch(e){}
+  try{ var sp=new URLSearchParams(location.search); commandeId=(sp.get('commande')||'').trim(); chansonNum=(sp.get('chanson')||'').trim(); }catch(e){}
   if(commandeId){
     const b=document.getElementById('cmdBanner');
-    if(b){ b.textContent='🎛️ Tu produis la commande #'+commandeId+' — l’identifiant sera enregistré automatiquement dans le carnet à la publication.'; b.style.display='block'; }
+    if(b){ b.textContent='🎛️ Tu produis '+cmdLabel()+' — l’identifiant sera enregistré automatiquement dans le carnet à la publication.'; b.style.display='block'; }
   }
 })();
 </script>

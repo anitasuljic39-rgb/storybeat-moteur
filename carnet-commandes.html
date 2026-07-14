@@ -226,7 +226,8 @@
 
   // ---------- bloc "Chanson N" (identifiant + liens) — utilisé quand nb_chansons === 2 ----------
   // Chanson 1 lit/écrit prod_id ; chanson 2 lit/écrit prod_id_2. Liens construits depuis l'identifiant du bloc.
-  function songSection(numero, prodId, field){
+  function songSection(order, numero, prodId, field){
+    var produce = '<div style="margin-top:10px"><a class="btn-produce" href="/?commande='+encodeURIComponent(order)+'&chanson='+numero+'" target="_blank" rel="noopener">🎛️ Produire la Chanson '+numero+'</a></div>';
     var liens = '';
     if (prodId) {
       var B = 'https://ecoute.storybeat.fr';
@@ -246,7 +247,7 @@
     }
     var prod = '<div class="prodid"><label>🎬 Identifiant de production <span style="font-weight:400">(celui du Moteur, ex. clara-k7x — sans -a ni -choix)</span></label>'+
       '<div class="row2"><input type="text" class="prodinput" data-field="'+field+'" placeholder="ex : clara-k7x" value="'+esc(prodId||'')+'"><button type="button" class="prodsave" data-field="'+field+'">Enregistrer</button></div></div>';
-    return '<div class="songblock"><div class="songblock-t">🎵 Chanson '+numero+'</div>'+liens+prod+'</div>';
+    return '<div class="songblock"><div class="songblock-t">🎵 Chanson '+numero+'</div>'+produce+liens+prod+'</div>';
   }
 
   // ---------- rendu d'une carte ----------
@@ -289,9 +290,13 @@
     // Bloc identifiants + liens :
     //  · nb_chansons === 2 → deux blocs séparés (Chanson 1 → prod_id, Chanson 2 → prod_id_2)
     //  · sinon (1 chanson ou absent) → EXACTEMENT comme avant : un seul champ prod_id + son bloc de liens
+    // Bouton "Produire" : commande à 1 chanson → un seul bouton en tête (comme avant) ;
+    // commande à 2 chansons → un bouton par bloc chanson (rendu dans songSection), pas de bouton en tête.
+    var produceHeader = (c.nb_chansons === 2) ? '' :
+      '<div style="margin-top:10px"><a class="btn-produce" href="/?commande='+encodeURIComponent(c.order_id)+'" target="_blank" rel="noopener">🎛️ Produire cette commande</a></div>';
     var prodSection;
     if (c.nb_chansons === 2) {
-      prodSection = songSection(1, c.prod_id, 'prod_id') + songSection(2, c.prod_id_2, 'prod_id_2');
+      prodSection = songSection(c.order_id, 1, c.prod_id, 'prod_id') + songSection(c.order_id, 2, c.prod_id_2, 'prod_id_2');
     } else {
       prodSection = liens +
         '<div class="prodid"><label>🎬 Identifiant de production <span style="font-weight:400">(celui du Moteur, ex. clara-k7x — sans -a ni -choix)</span></label>'+
@@ -305,7 +310,7 @@
         '<span class="badge '+statutClass(c.statut)+'">'+esc(c.statut||'—')+'</span>'+
       '</div>'+
       '<div style="margin-top:10px"><span class="b-form">'+esc(c.formule||'—')+'</span></div>'+
-      '<div style="margin-top:10px"><a class="btn-produce" href="/?commande='+encodeURIComponent(c.order_id)+'" target="_blank" rel="noopener">🎛️ Produire cette commande</a></div>'+
+      produceHeader+
       '<div class="lignes">'+lignes+'<div class="total"><span>Total</span><span>'+eur(c.montant_total_eur)+'</span></div></div>'+
       chansons+
       '<div class="stbtns">'+stbtns+'</div>'+
