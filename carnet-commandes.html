@@ -103,6 +103,11 @@
   .prodinput:focus{outline:none;border-color:var(--violet)}
   .prodsave{border:1px solid var(--line);background:var(--card2);color:#4a3f66;font-weight:700;font-size:12.5px;padding:8px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
   .prodsave:disabled{opacity:.5;cursor:wait}
+  /* blocs par chanson (commandes à 2 chansons) */
+  .songblock{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fbf8ff}
+  .songblock-t{font-family:'Sora',sans-serif;font-weight:800;font-size:14px;margin-bottom:2px}
+  .songblock .liens{margin-top:10px}
+  .songblock .prodid{margin-top:10px}
   @media(max-width:560px){ .finances{grid-template-columns:1fr} }
 </style>
 </head>
@@ -219,6 +224,31 @@
     });
   }
 
+  // ---------- bloc "Chanson N" (identifiant + liens) — utilisé quand nb_chansons === 2 ----------
+  // Chanson 1 lit/écrit prod_id ; chanson 2 lit/écrit prod_id_2. Liens construits depuis l'identifiant du bloc.
+  function songSection(numero, prodId, field){
+    var liens = '';
+    if (prodId) {
+      var B = 'https://ecoute.storybeat.fr';
+      var vLien = B + '/valider/?id=' + prodId + '-choix';
+      var eA = B + '/?id=' + prodId + '-a';
+      var eB = B + '/?id=' + prodId + '-b';
+      var row = function(lab, url, main){
+        return '<div class="lien'+(main?' lien-main':'')+'"><span class="lien-lab">'+lab+'</span>'+
+          '<div class="lien-row"><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a>'+
+          '<button type="button" class="copybtn" data-copy="'+esc(url)+'">Copier</button></div></div>';
+      };
+      liens = '<div class="liens"><div class="liens-t">🔗 Liens à envoyer</div>'+
+        row('Validation — à envoyer à la cliente', vLien, true)+
+        row('Écoute A', eA, false)+
+        row('Écoute B', eB, false)+
+        '</div>';
+    }
+    var prod = '<div class="prodid"><label>🎬 Identifiant de production <span style="font-weight:400">(celui du Moteur, ex. clara-k7x — sans -a ni -choix)</span></label>'+
+      '<div class="row2"><input type="text" class="prodinput" data-field="'+field+'" placeholder="ex : clara-k7x" value="'+esc(prodId||'')+'"><button type="button" class="prodsave" data-field="'+field+'">Enregistrer</button></div></div>';
+    return '<div class="songblock"><div class="songblock-t">🎵 Chanson '+numero+'</div>'+liens+prod+'</div>';
+  }
+
   // ---------- rendu d'une carte ----------
   function cardHTML(c){
     var lignes = (c.lignes||[]).map(function(l){
@@ -256,6 +286,17 @@
         (c.nb_chansons===2 ? row('Écoute B', eB, false) : '')+
         '</div>';
     }
+    // Bloc identifiants + liens :
+    //  · nb_chansons === 2 → deux blocs séparés (Chanson 1 → prod_id, Chanson 2 → prod_id_2)
+    //  · sinon (1 chanson ou absent) → EXACTEMENT comme avant : un seul champ prod_id + son bloc de liens
+    var prodSection;
+    if (c.nb_chansons === 2) {
+      prodSection = songSection(1, c.prod_id, 'prod_id') + songSection(2, c.prod_id_2, 'prod_id_2');
+    } else {
+      prodSection = liens +
+        '<div class="prodid"><label>🎬 Identifiant de production <span style="font-weight:400">(celui du Moteur, ex. clara-k7x — sans -a ni -choix)</span></label>'+
+        '<div class="row2"><input type="text" class="prodinput" placeholder="ex : clara-k7x" value="'+esc(c.prod_id||'')+'"><button type="button" class="prodsave">Enregistrer</button></div></div>';
+    }
     return ''+
       '<div class="ctop">'+
         '<div><div class="cnum">Commande #'+esc(c.order_id)+'</div>'+
@@ -268,9 +309,7 @@
       '<div class="lignes">'+lignes+'<div class="total"><span>Total</span><span>'+eur(c.montant_total_eur)+'</span></div></div>'+
       chansons+
       '<div class="stbtns">'+stbtns+'</div>'+
-      liens+
-      '<div class="prodid"><label>🎬 Identifiant de production <span style="font-weight:400">(celui du Moteur, ex. clara-k7x — sans -a ni -choix)</span></label>'+
-        '<div class="row2"><input type="text" class="prodinput" placeholder="ex : clara-k7x" value="'+esc(c.prod_id||'')+'"><button type="button" class="prodsave">Enregistrer</button></div></div>';
+      prodSection;
   }
 
   function renderList(){
@@ -308,15 +347,19 @@
   }
 
   // ---------- enregistrer l'identifiant de production (le « pont » vers les liens) ----------
-  function setProdId(order, prodId, cardEl){
-    var btn=cardEl.querySelector('.prodsave'); var old=btn.textContent; btn.disabled=true; btn.textContent='…';
-    fetch(API_SET, { method:'POST', headers:{ 'x-tool-password':PW, 'Content-Type':'application/json' }, body: JSON.stringify({ order_id: order, prod_id: prodId }) })
+  function setProdId(order, prodId, cardEl, field){
+    field = field || 'prod_id'; // 'prod_id' (chanson 1) ou 'prod_id_2' (chanson 2)
+    var btn = cardEl.querySelector('.prodsave[data-field="'+field+'"]') || cardEl.querySelector('.prodsave');
+    var old=btn.textContent; btn.disabled=true; btn.textContent='…';
+    var payload = { order_id: order }; payload[field] = prodId;
+    fetch(API_SET, { method:'POST', headers:{ 'x-tool-password':PW, 'Content-Type':'application/json' }, body: JSON.stringify(payload) })
       .then(function(r){ if(r.status===401){ logout('Mot de passe incorrect.'); throw new Error('401'); } return r.json(); })
       .then(function(d){
         if(!d.ok){ toast('❌ '+(d.error||'Échec')); btn.disabled=false; btn.textContent=old; return; }
         var c = STATE.all.filter(function(x){ return String(x.order_id)===String(order); })[0];
-        if(c) c.prod_id = d.prod_id;
-        toast(d.prod_id ? ('✅ Identifiant enregistré : '+d.prod_id) : '✅ Enregistré');
+        if(c){ if('prod_id' in d) c.prod_id = d.prod_id; if('prod_id_2' in d) c.prod_id_2 = d.prod_id_2; }
+        var saved = d[field];
+        toast(saved ? ('✅ Identifiant enregistré : '+saved) : '✅ Enregistré');
         if(c && cardEl) cardEl.innerHTML = cardHTML(c);
       })
       .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btn.disabled=false; btn.textContent=old; } });
@@ -329,7 +372,7 @@
     var st = e.target.closest ? e.target.closest('.stbtn') : null;
     if(st && !st.disabled){ var card = st.closest('.card'); setStatut(card.getAttribute('data-order'), st.getAttribute('data-st'), card); return; }
     var save = e.target.closest ? e.target.closest('.prodsave') : null;
-    if(save && !save.disabled){ var card2 = save.closest('.card'); var inp = card2.querySelector('.prodinput'); setProdId(card2.getAttribute('data-order'), (inp.value||'').trim(), card2); return; }
+    if(save && !save.disabled){ var card2 = save.closest('.card'); var field = save.getAttribute('data-field') || 'prod_id'; var scope = save.closest('.songblock') || card2; var inp = scope.querySelector('.prodinput'); setProdId(card2.getAttribute('data-order'), (inp.value||'').trim(), card2, field); return; }
     var cp = e.target.closest ? e.target.closest('.copybtn') : null;
     if(cp){ var txt=cp.getAttribute('data-copy'); if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast('✅ Lien copié'); }).catch(function(){ toast('Copie impossible — sélectionne le lien à la main'); }); } else { toast('Copie non supportée ici'); } }
   });
