@@ -86,6 +86,13 @@
   .empty,.spin{text-align:center;color:var(--muted);padding:50px 18px;border:1px dashed var(--line);border-radius:16px}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#fff;border:1px solid var(--line);box-shadow:0 12px 30px -14px rgba(90,50,140,.5);padding:12px 18px;border-radius:12px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;max-width:90%}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .prodid{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+  .prodid label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .prodid .row2{display:flex;gap:8px}
+  .prodinput{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--txt)}
+  .prodinput:focus{outline:none;border-color:var(--violet)}
+  .prodsave{border:1px solid var(--line);background:var(--card2);color:#4a3f66;font-weight:700;font-size:12.5px;padding:8px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+  .prodsave:disabled{opacity:.5;cursor:wait}
   @media(max-width:560px){ .finances{grid-template-columns:1fr} }
 </style>
 </head>
@@ -232,7 +239,9 @@
       '<div style="margin-top:10px"><span class="b-form">'+esc(c.formule||'—')+'</span></div>'+
       '<div class="lignes">'+lignes+'<div class="total"><span>Total</span><span>'+eur(c.montant_total_eur)+'</span></div></div>'+
       chansons+
-      '<div class="stbtns">'+stbtns+'</div>';
+      '<div class="stbtns">'+stbtns+'</div>'+
+      '<div class="prodid"><label>🎬 Identifiant de production <span style="font-weight:400">(celui du Moteur, ex. clara-k7x — sans -a ni -choix)</span></label>'+
+        '<div class="row2"><input type="text" class="prodinput" placeholder="ex : clara-k7x" value="'+esc(c.prod_id||'')+'"><button type="button" class="prodsave">Enregistrer</button></div></div>';
   }
 
   function renderList(){
@@ -269,12 +278,29 @@
       .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btns.forEach(function(b){ b.disabled=false; }); } });
   }
 
+  // ---------- enregistrer l'identifiant de production (le « pont » vers les liens) ----------
+  function setProdId(order, prodId, cardEl){
+    var btn=cardEl.querySelector('.prodsave'); var old=btn.textContent; btn.disabled=true; btn.textContent='…';
+    fetch(API_SET, { method:'POST', headers:{ 'x-tool-password':PW, 'Content-Type':'application/json' }, body: JSON.stringify({ order_id: order, prod_id: prodId }) })
+      .then(function(r){ if(r.status===401){ logout('Mot de passe incorrect.'); throw new Error('401'); } return r.json(); })
+      .then(function(d){
+        if(!d.ok){ toast('❌ '+(d.error||'Échec')); btn.disabled=false; btn.textContent=old; return; }
+        var c = STATE.all.filter(function(x){ return String(x.order_id)===String(order); })[0];
+        if(c) c.prod_id = d.prod_id;
+        toast(d.prod_id ? ('✅ Identifiant enregistré : '+d.prod_id) : '✅ Enregistré');
+        if(c && cardEl) cardEl.innerHTML = cardHTML(c);
+      })
+      .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btn.disabled=false; btn.textContent=old; } });
+  }
+
   // ---------- délégation d'événements sur la liste ----------
   $('#list').addEventListener('click', function(e){
     var histBtn = e.target.closest ? e.target.closest('.histoire-btn') : null;
     if(histBtn){ var body = histBtn.closest('.chanson').querySelector('.histoire-body'); if(body){ body.classList.toggle('show'); histBtn.textContent = body.classList.contains('show') ? 'Masquer l\'histoire ▴' : 'Voir l\'histoire ▾'; } return; }
     var st = e.target.closest ? e.target.closest('.stbtn') : null;
-    if(st && !st.disabled){ var card = st.closest('.card'); setStatut(card.getAttribute('data-order'), st.getAttribute('data-st'), card); }
+    if(st && !st.disabled){ var card = st.closest('.card'); setStatut(card.getAttribute('data-order'), st.getAttribute('data-st'), card); return; }
+    var save = e.target.closest ? e.target.closest('.prodsave') : null;
+    if(save && !save.disabled){ var card2 = save.closest('.card'); var inp = card2.querySelector('.prodinput'); setProdId(card2.getAttribute('data-order'), (inp.value||'').trim(), card2); }
   });
 
   // ---------- filtres (délégation) ----------
