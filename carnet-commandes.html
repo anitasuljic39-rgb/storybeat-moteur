@@ -108,6 +108,29 @@
   .songblock-t{font-family:'Sora',sans-serif;font-weight:800;font-size:14px;margin-bottom:2px}
   .songblock .liens{margin-top:10px}
   .songblock .prodid{margin-top:10px}
+  /* Niveau 1 : recherche + tableau des commandes */
+  .search{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--txt);font-size:14px;font-family:inherit}
+  .search:focus{outline:none;border-color:var(--violet)}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 12px 30px -24px rgba(90,50,140,.35)}
+  .otable{width:100%;border-collapse:collapse;font-size:13.5px}
+  .otable th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .otable td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .otable tbody tr{cursor:pointer;transition:background .12s}
+  .otable tbody tr:hover{background:var(--card2)}
+  .otable tbody tr:last-child td{border-bottom:none}
+  .c-email b{font-size:14px}
+  .c-sub{color:var(--muted);font-size:11.5px;margin-top:2px;word-break:break-all}
+  .c-nb{text-align:center;font-weight:700}
+  .c-montant{font-weight:700;white-space:nowrap}
+  .q-ok{color:#0f9d63;font-weight:700;white-space:nowrap}
+  .q-wait{color:#b26a00;font-weight:700;white-space:nowrap}
+  .dl{font-weight:700;white-space:nowrap}
+  .dl-green{color:#0f9d63}
+  .dl-orange{color:#b26a00}
+  .dl-red{color:#d6006a}
+  .dl-none{color:var(--muted)}
+  .dl-budget{display:block;font-size:10.5px;color:var(--muted);font-weight:600;margin-top:1px}
+  .back-btn{margin-bottom:14px}
   @media(max-width:560px){ .finances{grid-template-columns:1fr} }
 </style>
 </head>
@@ -138,7 +161,8 @@
     <div class="finances" id="finances"></div>
     <div class="breakdown" id="breakdown"></div>
 
-    <div class="filters">
+    <div class="filters" id="filters">
+      <div class="frow"><input id="search" class="search" type="text" placeholder="🔍 Rechercher une commande (email ou n°)" autocomplete="off"></div>
       <div class="frow" id="fStatut"><span class="flab">Statut :</span></div>
       <div class="frow" id="fQuest"><span class="flab">Questionnaire :</span></div>
     </div>
@@ -156,7 +180,7 @@
   var STATUTS = ['à traiter','en cours','livrée','remboursée'];
 
   var PW = '';
-  var STATE = { all: [], fStatut: 'tous', fQuest: 'tous' };
+  var STATE = { all: [], fStatut: 'tous', fQuest: 'tous', q: '', selected: null };
   var $ = function(s){ return document.querySelector(s); };
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -166,6 +190,50 @@
   function formuleClass(f){ return 'b-form'; }
   function questComplet(f){ return Array.isArray(f.chansons) && f.chansons.length>0 && f.chansons.every(function(c){ return c.questionnaire==='présent'; }); }
   function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._x); t._x=setTimeout(function(){ t.classList.remove('show'); }, 2600); }
+
+  // ---------- délai restant (SLA) ----------
+  // Essentielle → 24h après l'heure de commande ; Populaire / Premium (et autres) → 12h.
+  function delaiHeures(c){
+    var f = String(c.formule||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    return f.indexOf('essentiel') > -1 ? 24 : 12;
+  }
+  // Rendu coloré : vert > 3h, orange ≤ 3h, rouge si dépassé, — pour livrée/remboursée ou date absente.
+  function delaiHTML(c){
+    if(c.statut==='livrée' || c.statut==='remboursée') return '<span class="dl-none">—</span>';
+    if(!c.date) return '<span class="dl-none">—</span>';
+    var h = delaiHeures(c);
+    var ech = new Date(c.date).getTime() + h*3600*1000;
+    if(isNaN(ech)) return '<span class="dl-none">—</span>';
+    var diffH = (ech - Date.now())/3600000;
+    var budget = '<span class="dl-budget">sur '+h+'h</span>';
+    if(diffH < 0) return '<span class="dl dl-red">🔴 dépassé</span>'+budget;
+    var restH = Math.ceil(diffH);
+    var cls = diffH > 3 ? 'dl-green' : 'dl-orange';
+    var ico = diffH > 3 ? '⏱️' : '⚠️';
+    return '<span class="dl '+cls+'">'+ico+' '+restH+'h restantes</span>'+budget;
+  }
+
+  // ---------- ligne compacte (Niveau 1) ----------
+  function rowHTML(c){
+    var quest = questComplet(c) ? '<span class="q-ok">✅ complet</span>' : '<span class="q-wait">⏳ attente</span>';
+    return '<tr class="orow" data-order="'+esc(c.order_id)+'">'+
+      '<td class="c-email"><b>'+esc(c.email||'—')+'</b><div class="c-sub">#'+esc(c.order_id)+' · '+esc(dateFr(c.date))+'</div></td>'+
+      '<td class="c-delai">'+delaiHTML(c)+'</td>'+
+      '<td><span class="b-form">'+esc(c.formule||'—')+'</span></td>'+
+      '<td class="c-nb">'+esc(c.nb_chansons||1)+'</td>'+
+      '<td>'+quest+'</td>'+
+      '<td class="c-montant">'+eur(c.montant_total_eur)+'</td>'+
+      '<td><span class="badge '+statutClass(c.statut)+'">'+esc(c.statut||'—')+'</span></td>'+
+    '</tr>';
+  }
+
+  // Affiche/masque les blocs d'accueil (finances, filtres) selon le niveau (liste vs détail).
+  function setControlsVisible(v){
+    var f=$('#finances'), b=$('#breakdown'), fl=$('#filters');
+    if(f) f.style.display = v ? '' : 'none';
+    if(b) b.style.display = v ? '' : 'none';
+    if(fl) fl.style.display = v ? '' : 'none';
+  }
 
   // ---------- chargement ----------
   function load(){
@@ -213,10 +281,12 @@
   }
 
   function filtered(){
+    var q = String(STATE.q||'').trim().toLowerCase();
     return STATE.all.filter(function(c){
       if(STATE.fStatut!=='tous' && c.statut!==STATE.fStatut) return false;
       if(STATE.fQuest==='complet' && !questComplet(c)) return false;
       if(STATE.fQuest==='attente' && questComplet(c)) return false;
+      if(q){ var hay = (String(c.email||'')+' '+String(c.order_id||'')).toLowerCase(); if(hay.indexOf(q)===-1) return false; }
       return true;
     }).sort(function(a,b){
       var da=(a.date||a._maj_le||''), db=(b.date||b._maj_le||'');
@@ -250,8 +320,8 @@
     return '<div class="songblock"><div class="songblock-t">🎵 Chanson '+numero+'</div>'+produce+liens+prod+'</div>';
   }
 
-  // ---------- rendu d'une carte ----------
-  function cardHTML(c){
+  // ---------- rendu du détail COMPLET d'une commande (Niveau 2) — inchangé ----------
+  function detailHTML(c){
     var lignes = (c.lignes||[]).map(function(l){
       return '<div class="ligne"><span>'+esc(l.nom)+(l.bump?'<span class="bump">bump</span>':'')+'</span><span>'+eur(l.montant_eur)+'</span></div>';
     }).join('');
@@ -318,12 +388,26 @@
   }
 
   function renderList(){
-    var list = filtered();
     var el = $('#list');
+    // ----- Niveau 2 : détail complet d'une commande -----
+    if(STATE.selected != null){
+      setControlsVisible(false);
+      var c = STATE.all.filter(function(x){ return String(x.order_id)===String(STATE.selected); })[0];
+      var back = '<button type="button" class="btn ghost back-btn" data-back>← Retour à la liste</button>';
+      if(!c){ el.innerHTML = back + '<div class="empty">Commande introuvable.</div>'; return; }
+      el.innerHTML = back + '<div class="card" data-order="'+esc(c.order_id)+'">'+detailHTML(c)+'</div>';
+      return;
+    }
+    // ----- Niveau 1 : liste compacte (tableau) -----
+    setControlsVisible(true);
+    var list = filtered();
     if(!list.length){ el.innerHTML = '<div class="empty">Aucune commande pour ce filtre.</div>'; return; }
-    el.innerHTML = list.map(function(c){
-      return '<div class="card" data-order="'+esc(c.order_id)+'">'+cardHTML(c)+'</div>';
-    }).join('');
+    el.innerHTML = '<div class="tablewrap"><table class="otable">'+
+      '<thead><tr>'+
+        '<th>Cliente</th><th>Délai restant</th><th>Formule</th><th>Chansons</th><th>Questionnaire</th><th>Montant</th><th>Statut</th>'+
+      '</tr></thead><tbody>'+
+      list.map(rowHTML).join('')+
+      '</tbody></table></div>';
   }
 
   function findCardEl(order){ return document.querySelector('.card[data-order="'+String(order).replace(/"/g,'')+'"]'); }
@@ -343,9 +427,8 @@
         var c = STATE.all.filter(function(x){ return String(x.order_id)===String(order); })[0];
         if(c) c.statut = statut;
         toast('✅ Commande #'+order+' → '+statut);
-        // rafraîchir la carte seule (ou la retirer si un filtre statut l'exclut)
-        if(STATE.fStatut!=='tous' && STATE.fStatut!==statut){ if(cardEl) cardEl.remove(); }
-        else if(c && cardEl){ cardEl.innerHTML = cardHTML(c); }
+        // on est en vue détail (Niveau 2) : rafraîchir le détail affiché
+        if(c && cardEl){ cardEl.innerHTML = detailHTML(c); }
         renderFinances(); renderFilters();
       })
       .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btns.forEach(function(b){ b.disabled=false; }); } });
@@ -365,13 +448,19 @@
         if(c){ if('prod_id' in d) c.prod_id = d.prod_id; if('prod_id_2' in d) c.prod_id_2 = d.prod_id_2; }
         var saved = d[field];
         toast(saved ? ('✅ Identifiant enregistré : '+saved) : '✅ Enregistré');
-        if(c && cardEl) cardEl.innerHTML = cardHTML(c);
+        if(c && cardEl) cardEl.innerHTML = detailHTML(c);
       })
       .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btn.disabled=false; btn.textContent=old; } });
   }
 
   // ---------- délégation d'événements sur la liste ----------
   $('#list').addEventListener('click', function(e){
+    // Niveau 2 → Niveau 1 : retour à la liste
+    var back = e.target.closest ? e.target.closest('[data-back]') : null;
+    if(back){ STATE.selected = null; renderList(); window.scrollTo(0,0); return; }
+    // Niveau 1 → Niveau 2 : ouvrir le détail d'une commande (clic sur la ligne)
+    var row = e.target.closest ? e.target.closest('.orow') : null;
+    if(row){ STATE.selected = row.getAttribute('data-order'); renderList(); window.scrollTo(0,0); return; }
     var histBtn = e.target.closest ? e.target.closest('.histoire-btn') : null;
     if(histBtn){ var body = histBtn.closest('.chanson').querySelector('.histoire-body'); if(body){ body.classList.toggle('show'); histBtn.textContent = body.classList.contains('show') ? 'Masquer l\'histoire ▴' : 'Voir l\'histoire ▾'; } return; }
     var st = e.target.closest ? e.target.closest('.stbtn') : null;
@@ -392,6 +481,12 @@
     else STATE.fQuest = chip.getAttribute('data-v');
     renderFilters(); renderList();
   }
+
+  // ---------- recherche (email ou n°) ----------
+  document.getElementById('search').addEventListener('input', function(e){
+    STATE.q = e.target.value || '';
+    if(STATE.selected == null) renderList(); // ne s'applique qu'à la vue liste
+  });
 
   // ---------- bouton "Mettre à jour" (parser) ----------
   $('#refresh').addEventListener('click', function(){
