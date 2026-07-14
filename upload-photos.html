@@ -123,9 +123,9 @@
   var params = new URLSearchParams(location.search);
   var CODE  = (params.get('c') || '').trim();
   var TOKEN = (params.get('t') || '').trim();
-  var API        = '/api/client-sign-upload';
-  var API_LIST   = '/api/client-list';
-  var API_DELETE = '/api/client-delete';
+  var API        = '/api/client?action=sign-upload';
+  var API_LIST   = '/api/client?action=list';
+  var API_DELETE = '/api/client?action=delete';
   var MAX_BYTES  = 500 * 1024 * 1024; // 500 Mo par fichier
   var SOFT_LIMIT = 20;                 // garde-fou souple (n'empêche rien)
   var sentCount = 0;
@@ -209,7 +209,7 @@
   function uploadOne(job){
     var file=job.file, st=job.st, bar=job.bar;
     st.className='status wait'; st.textContent='Préparation…';
-    return fetch(API + '?c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN) + '&name=' + encodeURIComponent(file.name), { method:'POST' })
+    return fetch(API + '&c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN) + '&name=' + encodeURIComponent(file.name), { method:'POST' })
       .then(function(r){ return r.json().then(function(d){ return { ok:r.ok, status:r.status, d:d }; }); })
       .then(function(res){
         if (res.status === 403){ // jeton refusé : c'est le lien qui pose problème
@@ -252,7 +252,7 @@
   }
   function loadGallery(){
     if (!CODE || !TOKEN) return;
-    fetch(API_LIST + '?c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN), { method:'POST' })
+    fetch(API_LIST + '&c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN), { method:'POST' })
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
       .then(function(d){ if (d && d.ok) renderGallery(d.files || []); })
       .catch(function(){ /* silencieux : on ne casse jamais la page */ });
@@ -295,7 +295,7 @@
   }
   function removeFile(f, confirmEl){
     confirmEl.innerHTML = 'Suppression…';
-    fetch(API_DELETE + '?c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN) + '&name=' + encodeURIComponent(f.name), { method:'POST' })
+    fetch(API_DELETE + '&c=' + encodeURIComponent(CODE) + '&t=' + encodeURIComponent(TOKEN) + '&name=' + encodeURIComponent(f.name), { method:'POST' })
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
       .then(function(d){
         if (d && d.ok) { loadGallery(); }             // recharge : la tuile disparaît
