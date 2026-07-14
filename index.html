@@ -55,6 +55,21 @@ textarea{min-height:300px;resize:vertical}
 .slot-listen audio{width:100%}
 .slot-listen a{color:var(--violet);font-weight:700;font-size:13px;text-decoration:none}
 .slot-hint{font-size:11.5px;color:var(--muted);margin-top:6px}
+.phase3{margin-top:34px;border-top:1px solid var(--line);padding-top:26px}
+.kar-sel{display:flex;gap:10px;margin:6px 0 12px}
+.kar-sel label{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:13px}
+.kar-sel input{width:auto}
+.karbtn{border:none;cursor:pointer;font-family:var(--display);font-weight:700;border-radius:12px;padding:11px 18px;font-size:14px;background:var(--grad3);color:#fff}
+.karbtn.sec{background:var(--card2);color:#4a3f66;border:1px solid var(--line);font-family:var(--body);font-weight:600}
+.karbtn:disabled{opacity:.5;cursor:wait}
+#karAud{width:100%;margin:10px 0}
+.karlines{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff;margin-top:10px}
+.lrow{display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:8px;font-size:14px}
+.lrow.next{background:#f0eaff}
+.lrow.done{opacity:.55}
+.lrow .tm{min-width:56px;font-variant-numeric:tabular-nums;color:var(--violet);font-weight:700;font-size:12.5px}
+.lrow .tx{flex:1}
+.kar-tapbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 </style>
 </head>
 <body>
@@ -63,7 +78,7 @@ textarea{min-height:300px;resize:vertical}
   <div class="sub">Remplis, clique : les fiches sont créées et déposées sur GitHub toutes seules. Il te restera juste à mettre les fichiers audio sur Bunny (noms fournis).</div>
   <div class="grp"><label class="q">Mot de passe de l'outil</label><input id="password" type="password" placeholder="•••••"></div>
   <div class="row2">
-    <div class="grp"><label class="q">Identifiant cliente <span class="hint">(ex : clara — un code unique est ajouté tout seul)</span></label><input id="id" placeholder="clara"><button type="button" id="genUnique" style="margin-top:8px;padding:9px 16px;font-size:13px;border:none;border-radius:10px;background:#ff3aa8;color:#fff;font-weight:700;cursor:pointer">🎲 Nouveau code unique</button><div id="idNote" class="hint" style="margin-top:6px"></div></div>
+    <div class="grp"><label class="q">Identifiant cliente <span class="hint">(ex : clara — un code unique est ajouté tout seul)</span></label><input id="id" placeholder="clara"><button type="button" id="genUnique" style="margin-top:8px;padding:9px 16px;font-size:13px;border:none;border-radius:10px;background:#ff3aa8;color:#fff;font-weight:700;cursor:pointer">🎲 Nouveau code unique</button><div id="idNote" class="hint" style="margin-top:6px"></div><button type="button" id="newCmd" style="display:none;margin-top:8px;padding:9px 16px;font-size:13px;border:1px solid #e3d9f5;border-radius:10px;background:#f3eefb;color:#4a3f66;font-weight:600;cursor:pointer">🔄 Nouvelle commande</button><span id="idLock" style="display:none;margin-left:8px;font-size:12px;color:#6b6480">🔒 verrouillé</span></div>
     <div class="grp"><label class="q">Prénom</label><input id="prenom" placeholder="Clara"></div>
   </div>
   <div class="grp"><label class="q">Formule</label>
@@ -107,6 +122,33 @@ textarea{min-height:300px;resize:vertical}
     <label class="q">📤 Envoyer les fichiers sur Bunny <span class="hint">(chaque case impose le bon nom — rien à renommer)</span></label>
     <div class="hintsmall">Envoi direct sur Bunny — <b>gros fichiers vidéo acceptés, sans limite de taille</b>. Chaque fichier part automatiquement dans le dossier <b id="slotFolder">—</b></div>
     <div id="slots" class="slots"></div>
+  </div>
+
+  <div class="phase3" id="phase3" style="display:none">
+    <label class="q">⑤ Caler le karaoké <span class="hint">(les paroles et la chanson sont déjà là — tape le rythme)</span></label>
+    <div class="hintsmall" id="karGate">⏳ Publie d'abord les fiches, puis envoie la Version A sur Bunny.</div>
+    <div id="karTool" style="display:none">
+      <div class="kar-sel" id="karVersions" style="display:none">
+        <label><input type="radio" name="karver" value="a" checked> Version A</label>
+        <label><input type="radio" name="karver" value="b"> Version B</label>
+      </div>
+      <button type="button" class="karbtn" id="karPrep">▶ Préparer le calage</button>
+      <audio id="karAud" controls style="display:none"></audio>
+      <div id="karTap" style="display:none">
+        <div style="font-size:13px;color:var(--muted);margin:6px 0">Ligne <b id="karCur">1</b> / <b id="karTot">0</b> — lance la chanson, puis clique (ou <b>Espace</b>) au début de chaque ligne.</div>
+        <div class="kar-tapbar">
+          <button type="button" class="karbtn" id="karTapBtn">⏱️ Marquer cette ligne (Espace)</button>
+          <button type="button" class="karbtn sec" id="karUndo">↶ Annuler la dernière</button>
+          <button type="button" class="karbtn sec" id="karReset">Tout recommencer</button>
+        </div>
+        <div class="karlines" id="karLines"></div>
+        <div id="karPubWrap" style="display:none;margin-top:12px">
+          <div id="karPubState" style="font-size:13px;margin-bottom:8px"></div>
+          <button type="button" class="karbtn" id="karPubBtn">📤 Publier le karaoké</button>
+          <div id="karPubMsg" style="font-size:13.5px;margin-top:10px;word-break:break-word"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -155,6 +197,7 @@ document.getElementById('go').onclick=async()=>{
     }else{
       document.getElementById('o-photos-wrap').style.display='none';
     }
+    karBaseId=data.folder; fichesPubliees=true; lockId(); karRefreshGate();
     document.getElementById('out').classList.add('show');
     document.getElementById('out').scrollIntoView({behavior:'smooth'});
   }catch(e){
@@ -190,14 +233,14 @@ const slotEls=SLOTS.map(cfg=>{
   const input=el.querySelector('input');
   const statusEl=el.querySelector('.slot-status');
   const listenEl=el.querySelector('.slot-listen');
-  const st={uploaded:false};
+  const st={uploaded:false, url:''};
   dz.onclick=()=>input.click();
   ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
   ['dragleave','dragend','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
   dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)sendToSlot(cfg,f,statusEl,listenEl,st);});
   input.addEventListener('change',()=>{const f=input.files&&input.files[0];if(f)sendToSlot(cfg,f,statusEl,listenEl,st);input.value='';});
   slotsWrap.appendChild(el);
-  return {cfg, el, nameEl:el.querySelector('.slot-name'), statusEl};
+  return {cfg, el, nameEl:el.querySelector('.slot-name'), statusEl, st};
 });
 function refreshSlots(){
   const folder=slug(val('id'));
@@ -254,7 +297,8 @@ async function sendToSlot(cfg,file,statusEl,listenEl,st){
     const now=new Date(), p2=n=>String(n).padStart(2,'0'), hhmm=p2(now.getHours())+':'+p2(now.getMinutes());
     statusEl.className='slot-status ok';
     statusEl.textContent=(remplace?('🔁 Remplacé (à '+hhmm+')'):('✅ Envoyé (à '+hhmm+')'))+' — '+humanSize(file.size);
-    if(st) st.uploaded=true;
+    if(st){ st.uploaded=true; st.url=(signData.publicUrl||('https://storybeat.b-cdn.net/'+path)); }
+    if(typeof karRefreshGate==='function') karRefreshGate();
     // Bouton "écouter" : vérifier ce qui est RÉELLEMENT en ligne sur Bunny (anti-cache ?t=)
     if(listenEl){
       const url=(signData.publicUrl||('https://storybeat.b-cdn.net/'+path))+'?t='+Date.now();
@@ -269,6 +313,106 @@ async function sendToSlot(cfg,file,statusEl,listenEl,st){
     statusEl.className='slot-status err'; statusEl.textContent='❌ '+e.message;
   }
 }
+
+// ===== ⑤ Calage karaoké intégré (publie via /api/publish-karaoke, mot de passe en en-tête) =====
+const KAR_SITE='https://ecoute.storybeat.fr';
+let karBaseId='', fichesPubliees=false;
+let karLines=[], karTimes=[], karCur=0, karReady=false, karAB='a';
+const karAud=document.getElementById('karAud');
+
+function lockId(){ idEl.readOnly=true; idEl.style.opacity='.7';
+  const g=document.getElementById('genUnique'); if(g) g.style.display='none';
+  const n=document.getElementById('newCmd'); if(n) n.style.display='inline-block';
+  const l=document.getElementById('idLock'); if(l) l.style.display='inline'; }
+const newCmdBtn=document.getElementById('newCmd'); if(newCmdBtn) newCmdBtn.onclick=()=>location.reload();
+
+function karParolesFor(ab){
+  const two=radio('versions')==='2';
+  if(ab==='b'){ const same=document.getElementById('sameParoles').checked; const pb=val('parolesB');
+    return (two && !same && pb.trim()) ? pb : val('parolesA'); }
+  return val('parolesA');
+}
+function karSlotIdx(ab){ return ab==='b'?2:0; } // SLOTS: 0=a, 1=a-extrait, 2=b, 3=b-extrait
+function karSlotUploaded(ab){ const s=slotEls[karSlotIdx(ab)]; return !!(s && s.st && s.st.uploaded); }
+function karSlotUrl(ab){ const s=slotEls[karSlotIdx(ab)]; return (s && s.st && s.st.url) || ''; }
+
+function karRefreshGate(){
+  const phase3=document.getElementById('phase3');
+  if(radio('type')==='video'){ phase3.style.display='none'; return; } // vidéo : sous-titres intégrés au montage
+  phase3.style.display='block';
+  const two=radio('versions')==='2';
+  document.getElementById('karVersions').style.display = two?'flex':'none';
+  if(!two) karAB='a';
+  const gate=document.getElementById('karGate'), tool=document.getElementById('karTool');
+  if(!fichesPubliees){ gate.style.display='block'; gate.textContent='⏳ Publie d’abord les fiches (bouton « Créer et publier »).'; tool.style.display='none'; return; }
+  if(!karSlotUploaded(karAB)){ gate.style.display='block'; gate.textContent='⏳ Envoie d’abord la '+(karAB==='b'?'Version B':'Version A')+' sur Bunny (section ci-dessus).'; tool.style.display='none'; return; }
+  gate.style.display='none'; tool.style.display='block';
+}
+document.querySelectorAll('input[name="type"],input[name="versions"]').forEach(r=>r.addEventListener('change',karRefreshGate));
+document.querySelectorAll('input[name="karver"]').forEach(r=>r.addEventListener('change',()=>{ karAB=radio('karver')||'a'; karResetTap(); karRefreshGate(); }));
+
+function karFmt(s){ if(s==null||isNaN(s))return '—'; const m=Math.floor(s/60), ss=String(Math.floor(s%60)).padStart(2,'0'); return m+':'+ss+'.'+String(Math.floor((s%1)*10)); }
+function karRender(){
+  document.getElementById('karCur').textContent=Math.min(karCur+1,karLines.length);
+  const box=document.getElementById('karLines'); box.innerHTML='';
+  karLines.forEach((l,i)=>{
+    const done=karTimes[i]!=null, isNext=(i===karCur);
+    const row=document.createElement('div'); row.className='lrow'+(isNext?' next':'')+(done?' done':'');
+    const tm=document.createElement('span'); tm.className='tm'; tm.textContent=done?karFmt(karTimes[i]):'—';
+    const tx=document.createElement('span'); tx.className='tx'; tx.textContent=l;
+    row.appendChild(tm); row.appendChild(tx); box.appendChild(row);
+    if(isNext) row.scrollIntoView({block:'nearest'});
+  });
+}
+function karResetTap(){ karReady=false; document.getElementById('karTap').style.display='none'; document.getElementById('karPubWrap').style.display='none'; karAud.style.display='none'; }
+document.getElementById('karPrep').onclick=()=>{
+  const paroles=karParolesFor(karAB);
+  karLines=paroles.split('\n').map(l=>l.trim()).filter(l=>l.length);
+  if(!karLines.length){ karMsg('Aucune parole à caler pour cette version.','warn'); return; }
+  const url=karSlotUrl(karAB);
+  if(!url){ karMsg('Audio introuvable — renvoie la '+(karAB==='b'?'Version B':'Version A')+' sur Bunny.','warn'); return; }
+  karAud.src=url+(url.indexOf('?')>-1?'&':'?')+'t='+Date.now();
+  karAud.style.display='block';
+  karTimes=new Array(karLines.length).fill(null); karCur=0; karReady=true;
+  document.getElementById('karTot').textContent=karLines.length;
+  document.getElementById('karTap').style.display='block';
+  document.getElementById('karPubWrap').style.display='none';
+  document.getElementById('karPubMsg').textContent='';
+  karRender();
+};
+function karTap(){ if(!karReady||karCur>=karLines.length)return; karTimes[karCur]=karAud.currentTime; karCur++; karRender(); if(karCur>=karLines.length) karShowPublish(); }
+document.getElementById('karTapBtn').onclick=karTap;
+document.getElementById('karUndo').onclick=()=>{ if(karCur>0){ karCur--; karTimes[karCur]=null; karRender(); document.getElementById('karPubWrap').style.display='none'; } };
+document.getElementById('karReset').onclick=()=>{ karTimes=new Array(karLines.length).fill(null); karCur=0; karRender(); document.getElementById('karPubWrap').style.display='none'; };
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space' && karReady && document.getElementById('phase3').style.display!=='none'
+     && document.activeElement && ['TEXTAREA','INPUT','BUTTON'].indexOf(document.activeElement.tagName)===-1){
+    e.preventDefault(); karTap();
+  }
+});
+function karBuild(){ const items=[]; karLines.forEach((l,i)=>{ if(karTimes[i]!=null) items.push({t:Number(karTimes[i].toFixed(2)), l:l}); }); return items; }
+function karShowPublish(){
+  const kar=karBuild(), missing=karLines.length-kar.length;
+  document.getElementById('karPubState').innerHTML = missing
+    ? '<span style="color:#b26a00">⚠️ '+missing+' ligne(s) non calée(s) — elles ne seront pas dans le karaoké.</span>'
+    : '<span style="color:#0f9d63">✅ Toutes les lignes sont calées.</span>';
+  document.getElementById('karPubWrap').style.display='block';
+}
+function karMsg(m,kind){ const el=document.getElementById('karPubMsg'); el.textContent=m; el.style.color = kind==='ok'?'#0f9d63':(kind==='warn'?'#b26a00':'#d6006a'); }
+document.getElementById('karPubBtn').onclick=async()=>{
+  const kar=karBuild(); if(!kar.length){ karMsg('Cale au moins une ligne avant de publier.','warn'); return; }
+  const id=(karBaseId||slug(val('id')))+'-'+karAB;
+  const b=document.getElementById('karPubBtn'), old=b.textContent; b.disabled=true; b.textContent='Publication…';
+  try{
+    const r=await fetch('/api/publish-karaoke',{method:'POST',headers:{'x-tool-password':val('password'),'Content-Type':'application/json'},body:JSON.stringify({id:id,karaoke:kar})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.ok){ throw new Error(d.error||('Erreur '+r.status)); }
+    const lien=KAR_SITE+'/?id='+encodeURIComponent(id)+'&t='+Date.now();
+    document.getElementById('karPubMsg').innerHTML='✅ Karaoké publié dans <b>'+id+'</b> ('+d.lignes+' lignes). <a href="'+lien+'" target="_blank" rel="noopener" style="color:var(--violet);font-weight:700">Ouvrir la page d’écoute pour vérifier ▸</a>';
+  }catch(e){ karMsg('❌ '+e.message,'err'); }
+  finally{ b.disabled=false; b.textContent=old; }
+};
+karRefreshGate();
 </script>
 </body>
 </html>
