@@ -112,6 +112,8 @@ textarea{min-height:300px;resize:vertical}
     <div id="o-finals"></div>
     <h3>📩 À envoyer à la cliente</h3>
     <div class="send">Le SEUL lien à transmettre :<br><a id="o-valid" href="#" target="_blank"></a> <button class="btn copy" type="button" id="copyValid">Copier</button></div>
+    <h3>🃏 La carte-cadeau</h3>
+    <div class="send">Ouvre l'Atelier avec le lien du QR déjà rempli <span style="color:var(--muted)">(le fond reste à charger à la main)</span> :<br><a class="btn" id="o-carte" href="#" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;text-decoration:none">🃏 Créer la carte</a></div>
     <div id="o-photos-wrap" style="display:none">
       <h3>📸 Lien photos à envoyer à la cliente (Premium)</h3>
       <div class="send">Lien d'envoi de ses photos/vidéos :<br><a id="o-photos" href="#" target="_blank"></a> <button class="btn copy" type="button" id="copyPhotos">Copier</button></div>
@@ -190,6 +192,7 @@ document.getElementById('go').onclick=async()=>{
       '<div style="margin-bottom:8px;font-size:14px">'+l.label+' : <a href="'+l.url+'" target="_blank">'+l.url+'</a></div>').join('');
     const va=document.getElementById('o-valid');va.href=data.validationLink;va.textContent=data.validationLink;
     document.getElementById('copyValid').onclick=()=>navigator.clipboard.writeText(data.validationLink).then(()=>toast('Lien copié !'));
+    document.getElementById('o-carte').href='https://ecoute.storybeat.fr/atelier-storybeat.html?lien='+encodeURIComponent('https://ecoute.storybeat.fr/?id='+data.folder+'-a');
     if(data.clientUploadLink){
       const ph=document.getElementById('o-photos');ph.href=data.clientUploadLink;ph.textContent=data.clientUploadLink;
       document.getElementById('copyPhotos').onclick=()=>navigator.clipboard.writeText(data.clientUploadLink).then(()=>toast('Lien photos copié !'));
