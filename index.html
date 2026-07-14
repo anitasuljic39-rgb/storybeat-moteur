@@ -76,6 +76,7 @@ textarea{min-height:300px;resize:vertical}
 <div class="wrap">
   <h1>🎛️ Moteur StoryBeat</h1>
   <div class="sub">Remplis, clique : les fiches sont créées et déposées sur GitHub toutes seules. Il te restera juste à mettre les fichiers audio sur Bunny (noms fournis).</div>
+  <div id="cmdBanner" style="display:none;background:#f0eaff;border:1px solid #ddccff;color:#4a2f8f;border-radius:12px;padding:12px 14px;margin-bottom:18px;font-weight:600;font-size:14px"></div>
   <div class="grp"><label class="q">Mot de passe de l'outil</label><input id="password" type="password" placeholder="•••••"></div>
   <div class="row2">
     <div class="grp"><label class="q">Identifiant cliente <span class="hint">(ex : clara — un code unique est ajouté tout seul)</span></label><input id="id" placeholder="clara"><button type="button" id="genUnique" style="margin-top:8px;padding:9px 16px;font-size:13px;border:none;border-radius:10px;background:#ff3aa8;color:#fff;font-weight:700;cursor:pointer">🎲 Nouveau code unique</button><div id="idNote" class="hint" style="margin-top:6px"></div><button type="button" id="newCmd" style="display:none;margin-top:8px;padding:9px 16px;font-size:13px;border:1px solid #e3d9f5;border-radius:10px;background:#f3eefb;color:#4a3f66;font-weight:600;cursor:pointer">🔄 Nouvelle commande</button><span id="idLock" style="display:none;margin-left:8px;font-size:12px;color:#6b6480">🔒 verrouillé</span></div>
@@ -213,6 +214,21 @@ document.getElementById('go').onclick=async()=>{
       document.getElementById('o-photos-wrap').style.display='none';
     }
     karBaseId=data.folder; fichesPubliees=true; lockId(); karRefreshGate();
+    // Niveau 1 : si on vient du carnet, enregistrer l'identifiant dans la commande (feu et oubli, n'empêche jamais la publication déjà faite)
+    if(commandeId){
+      const bn=document.getElementById('cmdBanner');
+      try{
+        const rs=await fetch('/api/set-statut',{method:'POST',headers:{'x-tool-password':val('password'),'Content-Type':'application/json'},body:JSON.stringify({order_id:commandeId,prod_id:data.folder})});
+        const rd=await rs.json().catch(()=>({}));
+        if(rs.ok && rd.ok){
+          if(bn){ bn.style.background='#e7f8f1'; bn.style.borderColor='#b7ecd5'; bn.style.color='#0f7a4e'; bn.textContent='✅ Identifiant '+data.folder+' enregistré dans la commande #'+commandeId+'.'; }
+        } else {
+          if(bn){ bn.style.background='#fff5e6'; bn.style.borderColor='#ffe2b3'; bn.style.color='#b26a00'; bn.textContent='⚠️ Fiches publiées ✅ — mais l’identifiant n’a pas pu être enregistré dans la commande #'+commandeId+' ('+(rd.error||('erreur '+rs.status))+'). Tu peux le saisir à la main dans le carnet.'; }
+        }
+      }catch(e){
+        if(bn){ bn.style.background='#fff5e6'; bn.style.borderColor='#ffe2b3'; bn.style.color='#b26a00'; bn.textContent='⚠️ Fiches publiées ✅ — mais l’enregistrement dans la commande #'+commandeId+' a échoué (réseau). Tu peux le saisir à la main dans le carnet.'; }
+      }
+    }
     document.getElementById('out').classList.add('show');
     document.getElementById('out').scrollIntoView({behavior:'smooth'});
   }catch(e){
@@ -339,7 +355,7 @@ function lockId(){ idEl.readOnly=true; idEl.style.opacity='.7';
   const g=document.getElementById('genUnique'); if(g) g.style.display='none';
   const n=document.getElementById('newCmd'); if(n) n.style.display='inline-block';
   const l=document.getElementById('idLock'); if(l) l.style.display='inline'; }
-const newCmdBtn=document.getElementById('newCmd'); if(newCmdBtn) newCmdBtn.onclick=()=>location.reload();
+const newCmdBtn=document.getElementById('newCmd'); if(newCmdBtn) newCmdBtn.onclick=()=>{ location.href=location.pathname; }; // repart propre, sans ?commande
 
 function karParolesFor(ab){
   const two=radio('versions')==='2';
@@ -428,6 +444,16 @@ document.getElementById('karPubBtn').onclick=async()=>{
   finally{ b.disabled=false; b.textContent=old; }
 };
 karRefreshGate();
+
+// ===== Niveau 1 : lien carnet → Moteur (produire une commande précise) =====
+let commandeId='';
+(function(){
+  try{ commandeId=(new URLSearchParams(location.search).get('commande')||'').trim(); }catch(e){}
+  if(commandeId){
+    const b=document.getElementById('cmdBanner');
+    if(b){ b.textContent='🎛️ Tu produis la commande #'+commandeId+' — l’identifiant sera enregistré automatiquement dans le carnet à la publication.'; b.style.display='block'; }
+  }
+})();
 </script>
 </body>
 </html>
