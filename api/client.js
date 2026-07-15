@@ -99,21 +99,33 @@ module.exports = async (req, res) => {
   try {
     // ---------- LISTER ----------
     if (action === 'list') {
-      const url = presign('GET', '/' + awsUriEncode(BUCKET, true), { 'list-type': '2', 'prefix': prefix }, bunnySecret, EXPIRES_OP);
-      const r = await fetch(url, { method: 'GET' });
-      if (!r.ok) { const t = await r.text(); res.status(502).json({ error: 'Bunny ' + r.status, detail: t.slice(0, 300) }); return; }
-      const xml = await r.text();
+      // Jamais de cache : le carnet appelle en GET, on veut toujours l'état réel du dossier.
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
       const files = [];
-      const blocks = xml.match(/<Contents>[\s\S]*?<\/Contents>/g) || [];
-      for (const b of blocks) {
-        const km = b.match(/<Key>([\s\S]*?)<\/Key>/);
-        const sm = b.match(/<Size>([\s\S]*?)<\/Size>/);
-        if (!km) continue;
-        const key = km[1];
-        if (key === prefix) continue;
-        const name = key.slice(prefix.length);
-        if (!name || name.indexOf('/') !== -1) continue;
-        files.push({ name: name, size: sm ? parseInt(sm[1], 10) : 0, url: CDN_BASE + '/' + prefix + name });
+      // Pagination S3 (ListObjectsV2) : max-keys explicite + suivi du continuation-token
+      // tant que la réponse est tronquée, pour remonter TOUS les fichiers (pas seulement la 1re page).
+      let continuationToken = null;
+      for (let guard = 0; guard < 50; guard++) {
+        const extra = { 'list-type': '2', 'max-keys': '1000', 'prefix': prefix };
+        if (continuationToken) extra['continuation-token'] = continuationToken;
+        const url = presign('GET', '/' + awsUriEncode(BUCKET, true), extra, bunnySecret, EXPIRES_OP);
+        const r = await fetch(url, { method: 'GET' });
+        if (!r.ok) { const t = await r.text(); res.status(502).json({ error: 'Bunny ' + r.status, detail: t.slice(0, 300) }); return; }
+        const xml = await r.text();
+        const blocks = xml.match(/<Contents>[\s\S]*?<\/Contents>/g) || [];
+        for (const b of blocks) {
+          const km = b.match(/<Key>([\s\S]*?)<\/Key>/);
+          const sm = b.match(/<Size>([\s\S]*?)<\/Size>/);
+          if (!km) continue;
+          const key = km[1];
+          if (key === prefix) continue;
+          const name = key.slice(prefix.length);
+          if (!name || name.indexOf('/') !== -1) continue;
+          files.push({ name: name, size: sm ? parseInt(sm[1], 10) : 0, url: CDN_BASE + '/' + prefix + name });
+        }
+        const truncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml);
+        const ntm = xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/);
+        if (truncated && ntm && ntm[1].trim()) { continuationToken = ntm[1].trim(); } else { break; }
       }
       files.sort((a, b) => a.name < b.name ? -1 : (a.name > b.name ? 1 : 0));
       res.status(200).json({ ok: true, total: files.length, files: files });
