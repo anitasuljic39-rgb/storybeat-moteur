@@ -12,6 +12,7 @@ const HOST      = 'de-s3.storage.bunnycdn.com';
 const BUCKET    = 'storybeat-media';
 const ACCESS_ID = 'storybeat-media';
 const CDN_BASE  = 'https://storybeat.b-cdn.net';
+const STORAGE_BASE = 'https://storage.bunnycdn.com'; // API Storage NATIVE de Bunny (région 'de' = région par défaut → host principal)
 const EXPIRES_UPLOAD = 3600; // l'autorisation d'envoi dure 1h
 const EXPIRES_OP     = 120;  // list/delete : le serveur agit tout de suite
 
@@ -97,36 +98,19 @@ module.exports = async (req, res) => {
   const prefix = 'premium/' + code + '/';
 
   try {
-    // ---------- LISTER ----------
+    // ---------- LISTER (API Storage NATIVE de Bunny = contenu réel du dossier) ----------
+    // GET https://storage.bunnycdn.com/{zone}/premium/{code}/  avec en-tête AccessKey.
+    // Renvoie du JSON (ObjectName / Length / IsDirectory) — cohérent et immédiat, contrairement
+    // à l'index S3 secondaire qui sous-rapportait (2 fichiers sur 6).
     if (action === 'list') {
-      // Jamais de cache : le carnet appelle en GET, on veut toujours l'état réel du dossier.
-      res.setHeader('Cache-Control', 'no-store, max-age=0');
-      const files = [];
-      // Pagination S3 (ListObjectsV2) : max-keys explicite + suivi du continuation-token
-      // tant que la réponse est tronquée, pour remonter TOUS les fichiers (pas seulement la 1re page).
-      let continuationToken = null;
-      for (let guard = 0; guard < 50; guard++) {
-        const extra = { 'list-type': '2', 'max-keys': '1000', 'prefix': prefix };
-        if (continuationToken) extra['continuation-token'] = continuationToken;
-        const url = presign('GET', '/' + awsUriEncode(BUCKET, true), extra, bunnySecret, EXPIRES_OP);
-        const r = await fetch(url, { method: 'GET' });
-        if (!r.ok) { const t = await r.text(); res.status(502).json({ error: 'Bunny ' + r.status, detail: t.slice(0, 300) }); return; }
-        const xml = await r.text();
-        const blocks = xml.match(/<Contents>[\s\S]*?<\/Contents>/g) || [];
-        for (const b of blocks) {
-          const km = b.match(/<Key>([\s\S]*?)<\/Key>/);
-          const sm = b.match(/<Size>([\s\S]*?)<\/Size>/);
-          if (!km) continue;
-          const key = km[1];
-          if (key === prefix) continue;
-          const name = key.slice(prefix.length);
-          if (!name || name.indexOf('/') !== -1) continue;
-          files.push({ name: name, size: sm ? parseInt(sm[1], 10) : 0, url: CDN_BASE + '/' + prefix + name });
-        }
-        const truncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml);
-        const ntm = xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/);
-        if (truncated && ntm && ntm[1].trim()) { continuationToken = ntm[1].trim(); } else { break; }
-      }
+      res.setHeader('Cache-Control', 'no-store, max-age=0'); // toujours l'état réel du dossier
+      const listUrl = STORAGE_BASE + '/' + BUCKET + '/' + prefix; // prefix = premium/{code}/
+      const r = await fetch(listUrl, { headers: { 'AccessKey': bunnySecret, 'Accept': 'application/json' } });
+      if (!r.ok) { const t = await r.text(); res.status(502).json({ error: 'Bunny ' + r.status, detail: t.slice(0, 300) }); return; }
+      let arr; try { arr = await r.json(); } catch (e) { arr = []; }
+      const files = (Array.isArray(arr) ? arr : [])
+        .filter(o => o && o.IsDirectory === false && o.ObjectName)
+        .map(o => ({ name: o.ObjectName, size: Number(o.Length) || 0, url: CDN_BASE + '/' + prefix + o.ObjectName }));
       files.sort((a, b) => a.name < b.name ? -1 : (a.name > b.name ? 1 : 0));
       res.status(200).json({ ok: true, total: files.length, files: files });
       return;
@@ -149,8 +133,12 @@ module.exports = async (req, res) => {
 
     // ---------- SUPPRIMER ----------
     if (action === 'delete') {
-      const name = cleanName(q.name);
-      if (!name || name === '.') { res.status(400).json({ error: 'Nom de fichier manquant.' }); return; }
+      // On supprime EXACTEMENT le fichier tel qu'il est listé (nom réel), sans re-nettoyage :
+      // cleanName écrasait les '--' / '.' de tête et la clé DELETE ne correspondait plus à la clé
+      // réelle → certains fichiers (dont "le dernier") ne partaient jamais. On retire seulement un
+      // éventuel chemin (anti-traversée), sans toucher aux autres caractères du nom.
+      const name = String(q.name || '').split('/').pop().split('\\').pop();
+      if (!name || name === '.' || name === '..') { res.status(400).json({ error: 'Nom de fichier manquant.' }); return; }
       const key = prefix + name;
       const url = presign('DELETE', '/' + awsUriEncode(BUCKET, true) + '/' + awsUriEncode(key, false), {}, bunnySecret, EXPIRES_OP);
       const r = await fetch(url, { method: 'DELETE' });
