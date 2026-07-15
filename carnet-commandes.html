@@ -131,6 +131,16 @@
   .dl-none{color:var(--muted)}
   .dl-budget{display:block;font-size:10.5px;color:var(--muted);font-weight:600;margin-top:1px}
   .back-btn{margin-bottom:14px}
+  /* Fichiers cliente (Premium) */
+  .clifiles{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+  .clifiles-t{font-family:'Sora',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px}
+  .clifiles-sub{font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:var(--muted);margin:10px 0 6px}
+  .clifiles-empty{color:var(--muted);font-size:12.5px}
+  .clifiles-list{display:flex;flex-direction:column;gap:6px}
+  .clifile{display:flex;align-items:center;gap:10px;background:#fbf8ff;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .clifile-name{flex:1;min-width:0;font-size:12.5px;word-break:break-all}
+  .clifile-size{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .clifile-dl{text-decoration:none;background:var(--card2);border:1px solid var(--line);color:#4a3f66;font-weight:700;font-size:11.5px;padding:6px 10px;border-radius:8px;white-space:nowrap}
   @media(max-width:560px){ .finances{grid-template-columns:1fr} }
 </style>
 </head>
@@ -174,9 +184,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  var API_LIST  = '/api/carnet-list';
-  var API_BUILD = '/api/build-commandes';
-  var API_SET   = '/api/set-statut';
+  var API_LIST   = '/api/carnet-list';
+  var API_BUILD  = '/api/build-commandes';
+  var API_SET    = '/api/set-statut';
+  var API_CLIENT = '/api/client';
   var STATUTS = ['à traiter','en cours','livrée','remboursée'];
 
   var PW = '';
@@ -185,6 +196,8 @@
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function eur(n){ return (Number(n)||0).toFixed(2).replace('.',',')+' €'; }
+  function isPremium(c){ return String((c&&c.formule)||'').toLowerCase().indexOf('premium') > -1; }
+  function humanSize(b){ b=Number(b)||0; if(b>=1048576) return (b/1048576).toFixed(1)+' Mo'; if(b>=1024) return Math.max(1,Math.round(b/1024))+' Ko'; return b+' o'; }
   function statutClass(s){ return 'st-' + String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]+/gi,'-').toLowerCase(); }
   function dateFr(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso; } }
   function formuleClass(f){ return 'b-form'; }
@@ -372,6 +385,17 @@
         '<div class="prodid"><label>🎬 Identifiant de production <span style="font-weight:400">(celui du Moteur, ex. clara-k7x — sans -a ni -choix)</span></label>'+
         '<div class="row2"><input type="text" class="prodinput" placeholder="ex : clara-k7x" value="'+esc(c.prod_id||'')+'"><button type="button" class="prodsave">Enregistrer</button></div></div>';
     }
+    // Bloc "Fichiers de la cliente" : seulement pour les commandes Premium ayant un prod_id.
+    // Rendu vide au départ (placeholder) ; rempli en asynchrone par hydrateFiles/loadClientFiles.
+    var filesBlock = '';
+    if (isPremium(c) && c.prod_id) {
+      filesBlock = '<div class="clifiles" data-prodid="'+esc(c.prod_id)+'"'+
+        (c.prod_id_2 ? (' data-prodid2="'+esc(c.prod_id_2)+'"') : '')+
+        ' data-two="'+(c.nb_chansons===2?'1':'0')+'">'+
+        '<div class="clifiles-t">📎 Fichiers de la cliente</div>'+
+        '<div class="clifiles-body">Chargement des fichiers…</div>'+
+      '</div>';
+    }
     return ''+
       '<div class="ctop">'+
         '<div><div class="cnum">Commande #'+esc(c.order_id)+'</div>'+
@@ -384,8 +408,41 @@
       '<div class="lignes">'+lignes+'<div class="total"><span>Total</span><span>'+eur(c.montant_total_eur)+'</span></div></div>'+
       chansons+
       '<div class="stbtns">'+stbtns+'</div>'+
-      prodSection;
+      prodSection+
+      filesBlock;
   }
+
+  // ---------- fichiers cliente (Premium) : liste via client.js?action=list + mot de passe ----------
+  function fetchClientFiles(prodId){
+    return fetch(API_CLIENT+'?action=list&c='+encodeURIComponent(prodId), { headers:{ 'x-tool-password':PW } })
+      .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
+      .then(function(d){ if(!d.ok) throw new Error(d.error||'err'); return d.files||[]; });
+  }
+  function filesGroupHTML(label, files, error){
+    var head = label ? '<div class="clifiles-sub">'+label+'</div>' : '';
+    if(error)        return head+'<div class="clifiles-empty">Fichiers indisponibles pour le moment.</div>';
+    if(!files.length) return head+'<div class="clifiles-empty">Aucun fichier uploadé.</div>';
+    var rows = files.map(function(f){
+      return '<div class="clifile"><span class="clifile-name">'+esc(f.name)+'</span>'+
+        '<span class="clifile-size">'+humanSize(f.size)+'</span>'+
+        '<a class="clifile-dl" href="'+esc(f.url)+'" target="_blank" rel="noopener" download>Télécharger</a></div>';
+    }).join('');
+    return head+'<div class="clifiles-list">'+rows+'</div>';
+  }
+  function loadClientFiles(box){
+    if(!box || box._loading) return; box._loading = true;
+    var body = box.querySelector('.clifiles-body');
+    var two  = box.getAttribute('data-two')==='1';
+    var jobs = [{ pid: box.getAttribute('data-prodid'), label: two?'🎵 Chanson 1':null }];
+    var pid2 = box.getAttribute('data-prodid2'); if(pid2) jobs.push({ pid:pid2, label:'🎵 Chanson 2' });
+    Promise.all(jobs.map(function(j){
+      return fetchClientFiles(j.pid).then(function(files){ return filesGroupHTML(j.label, files, false); })
+        .catch(function(){ return filesGroupHTML(j.label, [], true); });
+    })).then(function(parts){ if(body) body.innerHTML = parts.join(''); })
+       .catch(function(){ if(body) body.innerHTML = '<div class="clifiles-empty">Fichiers indisponibles pour le moment.</div>'; });
+  }
+  // Charge les fichiers du bloc .clifiles présent dans un conteneur détail (non-bloquant).
+  function hydrateFiles(scope){ var box = scope && scope.querySelector ? scope.querySelector('.clifiles') : null; if(box) loadClientFiles(box); }
 
   function renderList(){
     var el = $('#list');
@@ -396,6 +453,7 @@
       var back = '<button type="button" class="btn ghost back-btn" data-back>← Retour à la liste</button>';
       if(!c){ el.innerHTML = back + '<div class="empty">Commande introuvable.</div>'; return; }
       el.innerHTML = back + '<div class="card" data-order="'+esc(c.order_id)+'">'+detailHTML(c)+'</div>';
+      hydrateFiles(el);
       return;
     }
     // ----- Niveau 1 : liste compacte (tableau) -----
@@ -428,7 +486,7 @@
         if(c) c.statut = statut;
         toast('✅ Commande #'+order+' → '+statut);
         // on est en vue détail (Niveau 2) : rafraîchir le détail affiché
-        if(c && cardEl){ cardEl.innerHTML = detailHTML(c); }
+        if(c && cardEl){ cardEl.innerHTML = detailHTML(c); hydrateFiles(cardEl); }
         renderFinances(); renderFilters();
       })
       .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btns.forEach(function(b){ b.disabled=false; }); } });
@@ -448,7 +506,7 @@
         if(c){ if('prod_id' in d) c.prod_id = d.prod_id; if('prod_id_2' in d) c.prod_id_2 = d.prod_id_2; }
         var saved = d[field];
         toast(saved ? ('✅ Identifiant enregistré : '+saved) : '✅ Enregistré');
-        if(c && cardEl) cardEl.innerHTML = detailHTML(c);
+        if(c && cardEl){ cardEl.innerHTML = detailHTML(c); hydrateFiles(cardEl); }
       })
       .catch(function(e){ if(e.message!=='401'){ toast('❌ Problème réseau'); btn.disabled=false; btn.textContent=old; } });
   }
