@@ -80,11 +80,18 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: 'Configuration serveur incomplète (CLIENT_UPLOAD_SECRET / BUNNY_S3_SECRET).' }); return;
   }
 
-  // Validation commune aux 3 actions : code + jeton
+  // Validation commune : le code est toujours requis. Pour l'accès, deux voies possibles :
+  //   • le jeton HMAC cliente (comportement historique, toutes actions) ;
+  //   • OU, UNIQUEMENT pour action=list, le mot de passe outil (TOOL_PASSWORD) → permet au
+  //     carnet de lister les fichiers d'une commande Premium sans avoir le jeton cliente.
+  // sign-upload / delete restent protégés par le jeton cliente SEUL (le carnet ne peut ni envoyer ni supprimer).
   const code  = String(q.c || '').trim().toLowerCase();
   const token = String(q.t || '').trim();
+  const password  = req.headers['x-tool-password'] || q.password || '';
+  const ownerAuth = !!(process.env.TOOL_PASSWORD && password === process.env.TOOL_PASSWORD);
+  const listOnly  = String(q.action || '').trim() === 'list';
   if (!/^[a-z0-9][a-z0-9-]{1,60}$/.test(code)) { res.status(400).json({ error: 'Lien invalide.' }); return; }
-  if (!safeEqual(token, tokenFor(code, clientSecret))) { res.status(403).json({ error: 'Lien invalide.' }); return; }
+  if (!(ownerAuth && listOnly) && !safeEqual(token, tokenFor(code, clientSecret))) { res.status(403).json({ error: 'Lien invalide.' }); return; }
 
   const action = String(q.action || '').trim();
   const prefix = 'premium/' + code + '/';
