@@ -18,7 +18,98 @@ function readRaw(req){
   });
 }
 
+// Cherche la fiche commande dont prod_id (chanson 1) ou prod_id_2 (chanson 2) == idExtrait.
+// Scanne le dossier commandes/ (comme carnet-list). Retourne {path, fiche, sha, chanson} ou null.
+async function findCommandeByExtrait(idExtrait, H){
+  const base = 'https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents/';
+  const lr = await fetch(base + 'commandes?ref=' + BRANCH + '&t=' + Date.now(), { headers: H });
+  if (!lr.ok) return null;
+  const items = await lr.json();
+  if (!Array.isArray(items)) return null;
+  for (const it of items) {
+    if (!it || it.type !== 'file' || !/\.json$/i.test(it.name || '')) continue;
+    const fr = await fetch(base + it.path + '?ref=' + BRANCH + '&t=' + Date.now(), { headers: H });
+    if (!fr.ok) continue;
+    let f; try { f = await fr.json(); } catch(e){ continue; }
+    let fiche;
+    try { fiche = JSON.parse(Buffer.from(f.content, f.encoding||'base64').toString('utf8')); } catch(e){ continue; }
+    const p1 = fiche.prod_id   ? String(fiche.prod_id).toLowerCase()   : null;
+    const p2 = fiche.prod_id_2 ? String(fiche.prod_id_2).toLowerCase() : null;
+    if (p1 && p1 === idExtrait) return { path: it.path, fiche: fiche, sha: f.sha, chanson: 1 };
+    if (p2 && p2 === idExtrait) return { path: it.path, fiche: fiche, sha: f.sha, chanson: 2 };
+  }
+  return null;
+}
+
+// Branche publique : écrit des champs dédiés (remboursement_demande / validation) dans la
+// fiche commande retrouvée via l'id d'extrait. Ne touche JAMAIS au statut. Non-bloquant :
+// en cas de souci (commande introuvable, config, GitHub), répond proprement sans planter.
+async function handlePublicEvent(res, body, type){
+  try {
+    const token = process.env.CARNET_GH_TOKEN;
+    if (!token) { res.status(200).json({ ok:false, error:'config serveur (CARNET_GH_TOKEN)' }); return; }
+
+    // id_extrait → prod_id : on retire le suffixe "-choix", puis on nettoie comme un prod_id.
+    let idExtrait = String(body.id_extrait != null ? body.id_extrait : (body.id != null ? body.id : '')).trim().toLowerCase();
+    idExtrait = idExtrait.replace(/-choix$/, '').replace(/[^a-z0-9-]/g, '');
+    if (!idExtrait) { res.status(400).json({ ok:false, error:'id_extrait manquant' }); return; }
+
+    const version = (body.version != null && String(body.version).trim() !== '') ? String(body.version).trim() : null;
+    const H = { 'Authorization':'Bearer '+token, 'Accept':'application/vnd.github+json', 'User-Agent':'storybeat-carnet' };
+
+    const found = await findCommandeByExtrait(idExtrait, H);
+    if (!found) { res.status(200).json({ ok:false, matched:false, id_extrait:idExtrait }); return; }
+
+    const { path, fiche, sha, chanson } = found;
+    const now = new Date().toISOString();
+    if (type === 'remboursement') {
+      fiche.remboursement_demande = true;
+      fiche._remb_le = now;
+      fiche.remb_chanson = chanson;
+    } else { // validation
+      fiche.validation = { version: version, chanson: chanson, valide_le: now };
+    }
+
+    const putR = await fetch('https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents/' + path, {
+      method: 'PUT',
+      headers: Object.assign({}, H, {'Content-Type':'application/json'}),
+      body: JSON.stringify({
+        message: 'Événement ' + type + ' — commande ' + (fiche.order_id!=null?fiche.order_id:'?') + ' (chanson ' + chanson + ')',
+        content: Buffer.from(JSON.stringify(fiche, null, 2)).toString('base64'),
+        sha: sha,
+        branch: BRANCH
+      })
+    });
+    if (!putR.ok) { const e = await putR.json().catch(()=>({})); res.status(200).json({ ok:false, error:'écriture GitHub '+putR.status+' : '+(e.message||'') }); return; }
+
+    res.status(200).json({ ok:true, type:type, order_id: (fiche.order_id!=null?fiche.order_id:null), chanson:chanson });
+  } catch (e) {
+    res.status(200).json({ ok:false, error: e.message });
+  }
+}
+
 module.exports = async (req, res) => {
+  // ─── CORS : la page publique de validation (ecoute.storybeat.fr) appelle cet endpoint
+  //     en cross-domaine. On autorise le préflight OPTIONS et les en-têtes nécessaires.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-tool-password');
+  if (req.method === 'OPTIONS') { res.status(204).end(); return; }
+
+  // On lit le corps UNE seule fois puis on le remet dans req.body (string), pour que la
+  // logique password ci-dessous (readRaw) le retrouve sans reconsommer le flux de requête.
+  const rawTop = await readRaw(req);
+  req.body = rawTop;
+  let bodyTop = {}; try { bodyTop = rawTop ? (JSON.parse(rawTop) || {}) : {}; } catch(e){ bodyTop = {}; }
+  const evType = String(bodyTop.type || '').trim().toLowerCase();
+
+  // ─── BRANCHE PUBLIQUE (sans mot de passe) : événements de la page de validation.
+  //     Écrit des CHAMPS DÉDIÉS (jamais le statut). Trouve la commande via prod_id/prod_id_2.
+  if (evType === 'validation' || evType === 'remboursement') {
+    return handlePublicEvent(res, bodyTop, evType);
+  }
+
+  // ─── BRANCHE PASSWORD (carnet) — inchangée. ───
   const getQuery = (r) => {
     if (r.query) return r.query;
     try { const u = new URL(r.url, 'http://x'); const o={}; u.searchParams.forEach((v,k)=>{o[k]=v;}); return o; }
