@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- ZIP côté navigateur (aucune fonction serveur) : rassemble les fichiers cliente en un .zip -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --fuchsia:#ff3aa8; --violet:#9b4dff; --blue:#1fd6ff;
@@ -141,6 +143,8 @@
   .clifile-name{flex:1;min-width:0;font-size:12.5px;word-break:break-all}
   .clifile-size{font-size:11.5px;color:var(--muted);white-space:nowrap}
   .clifile-dl{text-decoration:none;background:var(--card2);border:1px solid var(--line);color:#4a3f66;font-weight:700;font-size:11.5px;padding:6px 10px;border-radius:8px;white-space:nowrap}
+  .clizip{cursor:pointer;font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#fff;background:var(--grad);border:none;padding:8px 12px;border-radius:9px;margin-bottom:8px;box-shadow:0 8px 20px -12px rgba(155,77,255,.7)}
+  .clizip:disabled{opacity:.55;cursor:wait}
   @media(max-width:560px){ .finances{grid-template-columns:1fr} }
 </style>
 </head>
@@ -192,6 +196,7 @@
 
   var PW = '';
   var STATE = { all: [], fStatut: 'tous', fQuest: 'tous', q: '', selected: null };
+  var CLIFILES = {}; // cache prod_id → liste de fichiers (pour le ZIP côté navigateur)
   var $ = function(s){ return document.querySelector(s); };
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -418,16 +423,19 @@
       .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
       .then(function(d){ if(!d.ok) throw new Error(d.error||'err'); return d.files||[]; });
   }
-  function filesGroupHTML(label, files, error){
-    var head = label ? '<div class="clifiles-sub">'+label+'</div>' : '';
-    if(error)        return head+'<div class="clifiles-empty">Fichiers indisponibles pour le moment.</div>';
+  function zipNameFor(pid){ return 'fichiers-'+String(pid||'').replace(/[^a-z0-9-]/gi,'')+'.zip'; }
+  function filesGroupHTML(job, files, error){
+    var head = job.label ? '<div class="clifiles-sub">'+job.label+'</div>' : '';
+    if(error)         return head+'<div class="clifiles-empty">Fichiers indisponibles pour le moment.</div>';
     if(!files.length) return head+'<div class="clifiles-empty">Aucun fichier uploadé.</div>';
+    // Bouton ZIP (fabrication 100% navigateur, aucun appel serveur)
+    var zipBtn = '<button type="button" class="clizip" data-pid="'+esc(job.pid)+'" data-zipname="'+esc(zipNameFor(job.pid))+'">📦 Télécharger tout (ZIP)</button>';
     var rows = files.map(function(f){
       return '<div class="clifile"><span class="clifile-name">'+esc(f.name)+'</span>'+
         '<span class="clifile-size">'+humanSize(f.size)+'</span>'+
         '<a class="clifile-dl" href="'+esc(f.url)+'" target="_blank" rel="noopener" download>Télécharger</a></div>';
     }).join('');
-    return head+'<div class="clifiles-list">'+rows+'</div>';
+    return head+zipBtn+'<div class="clifiles-list">'+rows+'</div>';
   }
   function loadClientFiles(box){
     if(!box || box._loading) return; box._loading = true;
@@ -436,10 +444,37 @@
     var jobs = [{ pid: box.getAttribute('data-prodid'), label: two?'🎵 Chanson 1':null }];
     var pid2 = box.getAttribute('data-prodid2'); if(pid2) jobs.push({ pid:pid2, label:'🎵 Chanson 2' });
     Promise.all(jobs.map(function(j){
-      return fetchClientFiles(j.pid).then(function(files){ return filesGroupHTML(j.label, files, false); })
-        .catch(function(){ return filesGroupHTML(j.label, [], true); });
+      return fetchClientFiles(j.pid).then(function(files){ CLIFILES[j.pid]=files; return filesGroupHTML(j, files, false); })
+        .catch(function(){ CLIFILES[j.pid]=[]; return filesGroupHTML(j, [], true); });
     })).then(function(parts){ if(body) body.innerHTML = parts.join(''); })
        .catch(function(){ if(body) body.innerHTML = '<div class="clifiles-empty">Fichiers indisponibles pour le moment.</div>'; });
+  }
+  // ---------- ZIP côté navigateur (JSZip) : rassemble les fichiers d'un groupe en un .zip ----------
+  function zipGroup(btn){
+    var pid = btn.getAttribute('data-pid');
+    var zipname = btn.getAttribute('data-zipname') || 'fichiers.zip';
+    var files = CLIFILES[pid] || [];
+    if(!files.length){ toast('Aucun fichier à zipper.'); return; }
+    if(typeof JSZip === 'undefined'){ toast('❌ Librairie ZIP indisponible (réseau ?).'); return; }
+    var old = btn.textContent; btn.disabled = true; btn.textContent = '⏳ Préparation du ZIP…';
+    var zip = new JSZip(); var failed = [];
+    Promise.all(files.map(function(f){
+      return fetch(f.url).then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.blob(); })
+        .then(function(blob){ zip.file(f.name, blob); })
+        .catch(function(){ failed.push(f.name); }); // fichier bloqué (ex. CORS) → ignoré, non-bloquant
+    })).then(function(){
+      if(files.length - failed.length === 0) throw new Error('aucun fichier récupéré');
+      return zip.generateAsync({ type:'blob' });
+    }).then(function(blob){
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = zipname;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      btn.disabled = false; btn.textContent = old;
+      toast(failed.length ? ('⚠️ ZIP créé — '+failed.length+' fichier(s) non inclus') : '✅ ZIP téléchargé');
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = old;
+      toast('❌ ZIP impossible'+(failed.length ? ' — fichiers bloqués (CORS Bunny ?)' : '')+'. Utilise les boutons Télécharger.');
+    });
   }
   // Charge les fichiers du bloc .clifiles présent dans un conteneur détail (non-bloquant).
   function hydrateFiles(scope){ var box = scope && scope.querySelector ? scope.querySelector('.clifiles') : null; if(box) loadClientFiles(box); }
@@ -526,7 +561,9 @@
     var save = e.target.closest ? e.target.closest('.prodsave') : null;
     if(save && !save.disabled){ var card2 = save.closest('.card'); var field = save.getAttribute('data-field') || 'prod_id'; var scope = save.closest('.songblock') || card2; var inp = scope.querySelector('.prodinput'); setProdId(card2.getAttribute('data-order'), (inp.value||'').trim(), card2, field); return; }
     var cp = e.target.closest ? e.target.closest('.copybtn') : null;
-    if(cp){ var txt=cp.getAttribute('data-copy'); if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast('✅ Lien copié'); }).catch(function(){ toast('Copie impossible — sélectionne le lien à la main'); }); } else { toast('Copie non supportée ici'); } }
+    if(cp){ var txt=cp.getAttribute('data-copy'); if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast('✅ Lien copié'); }).catch(function(){ toast('Copie impossible — sélectionne le lien à la main'); }); } else { toast('Copie non supportée ici'); } return; }
+    var zb = e.target.closest ? e.target.closest('.clizip') : null;
+    if(zb && !zb.disabled){ zipGroup(zb); return; }
   });
 
   // ---------- filtres (délégation) ----------
